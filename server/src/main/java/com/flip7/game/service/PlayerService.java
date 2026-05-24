@@ -34,6 +34,7 @@ public class PlayerService {
                 .stream()
                 .map(player -> {
                     PlayerDTO dto = new PlayerDTO();
+                    dto.setId(player.getId());
                     dto.setName(player.getName());
                     dto.setTotalPoints(player.getTotalPoints());
                     return dto;

@@ -5,8 +5,9 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-public class PlayerDTO {
-    private Long id;
-    private String name;
+public class StandResultDTO {
+    private String playerName;
+    private int roundPoints;
     private int totalPoints;
+    private String message;
 }

@@ -25,6 +25,8 @@ bin/
 out/
 !**/src/main/**/out/
 !**/src/test/**/out/
+**/src/main/resources/application-local.properties
+
 
 ### NetBeans ###
 /nbproject/private/
@@ -35,4 +37,3 @@ out/
 
 ### VS Code ###
 .vscode/
-server/src/main/resources/application-local.properties
