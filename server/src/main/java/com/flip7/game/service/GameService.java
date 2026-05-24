@@ -18,6 +18,7 @@ public class GameService {
 
     private final GameRepository gameRepository;
     private final PlayerService playerService;
+    private final DeckService deckService;
 
     public GameDTO createGame(CreateGameDTO request) {
         if (request.getPlayers().size() < 4 || request.getPlayers().size() > 8) {
@@ -38,6 +39,7 @@ public class GameService {
         dto.setStatus(game.getGameStatus());
         dto.setCurrentRound(game.getCurrentRound());
         dto.setPlayers(playerService.getPlayersByGame(game.getId()));
+        deckService.createDeck(game);
         return dto;
     }
 
