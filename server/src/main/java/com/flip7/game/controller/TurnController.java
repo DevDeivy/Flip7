@@ -1,7 +1,7 @@
 package com.flip7.game.controller;
 
-import com.flip7.game.DTO.DrawResultDTO;
-import com.flip7.game.DTO.StandResultDTO;
+import com.flip7.game.DTO.FullGameStateDTO;
+import com.flip7.game.service.GameService;
 import com.flip7.game.service.TurnService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -16,14 +16,21 @@ import org.springframework.web.bind.annotation.RestController;
 public class TurnController {
 
     private final TurnService turnService;
+    private final GameService gameService;
 
     @PostMapping("/{gameId}/draw")
-    public ResponseEntity<DrawResultDTO> drawCard(@PathVariable Long gameId) {
-        return ResponseEntity.ok(turnService.drawCard(gameId));
+    public ResponseEntity<FullGameStateDTO> drawCard(@PathVariable Long gameId) {
+        String message = turnService.drawCard(gameId);
+        FullGameStateDTO state = gameService.getFullState(gameId);
+        state.setLastMessage(message);
+        return ResponseEntity.ok(state);
     }
 
     @PostMapping("/{gameId}/stand")
-    public ResponseEntity<StandResultDTO> stand(@PathVariable Long gameId) {
-        return ResponseEntity.ok(turnService.stand(gameId));
+    public ResponseEntity<FullGameStateDTO> stand(@PathVariable Long gameId) {
+        String message = turnService.stand(gameId);
+        FullGameStateDTO state = gameService.getFullState(gameId);
+        state.setLastMessage(message);
+        return ResponseEntity.ok(state);
     }
 }
