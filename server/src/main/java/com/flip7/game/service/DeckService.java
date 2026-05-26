@@ -21,6 +21,12 @@ public class DeckService {
         return deckRepository.save(deck);
     }
 
+    public boolean isDeckEmpty(Game game) {
+        Deck deck = deckRepository.findByGameId(game.getId())
+                .orElseThrow(() -> new RuntimeException("Mazo no encontrado"));
+        return deck.isEmpty();
+    }
+
     public int drawCard(Game game) {
         Deck deck = deckRepository.findByGameId(game.getId())
                 .orElseThrow(() -> new RuntimeException("Mazo no encontrado"));
@@ -36,4 +42,3 @@ public class DeckService {
         return card;
     }
 }
-

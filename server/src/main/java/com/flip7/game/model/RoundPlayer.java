@@ -45,8 +45,21 @@ public class RoundPlayer {
     @Column(name = "card")
     private List<Integer> currentCards = new ArrayList<>();
 
+    @ElementCollection
+    @CollectionTable(name = "round_player_modifier_cards", joinColumns = @JoinColumn(name = "round_player_id"))
+    @Column(name = "modifier_card")
+    private List<Integer> modifierCardValues = new ArrayList<>();
+
     @Enumerated(EnumType.STRING)
     private RoundPlayerStatus status = RoundPlayerStatus.ACTIVE;
 
     private int roundPoints = 0;
+
+    private boolean hasSecondChance = false;
+
+    private boolean hasX2Multiplier = false;
+
+    private int modifierBonus = 0;
+
+    private int pendingFlipThree = 0;
 }

@@ -1,11 +1,15 @@
 import { Route, Routes } from 'react-router-dom';
 
-import { GamePage } from './features/game/pages/GamePage';
+import { Home } from './features/game/pages/Home';
+import { MultiplayerPage } from './features/game/pages/MultiplayerPage';
 
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<GamePage />} />
+      <Route path="/" element={<Home />} />
+      <Route path="/multiplayer" element={<MultiplayerPage />} />
+      <Route path="/vs-ai" element={<MultiplayerPage />} />
+
     </Routes>
   );
 }
