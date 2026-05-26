@@ -8,4 +8,4 @@ export * from './components/PlayerSidebar';
 export * from './components/RiskMeter';
 export * from './components/RoundSummaryModal';
 export * from './components/WinnerModal';
-export * from './pages/GamePage';
+export * from './pages/MultiplayerPage';

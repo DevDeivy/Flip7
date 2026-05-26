@@ -11,7 +11,7 @@ import { useGameActions } from '../hooks/useGameActions';
 import { useGameState } from '../hooks/useGameState';
 import { useGameStore } from '../store/gameStore';
 
-export function GamePage() {
+export function MultiplayerPage() {
   const game = useGameState();
   const { initializeGame, drawCard, stand, nextRound, restartGame, dismissDuplicateAlert } = useGameActions();
   const isBusy = useGameStore((state) => state.isBusy);
