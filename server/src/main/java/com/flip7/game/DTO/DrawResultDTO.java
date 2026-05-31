@@ -11,6 +11,7 @@ import java.util.List;
 public class DrawResultDTO {
     private String playerName;
     private int cardDrawn;
+    private String cardType;
     private List<Integer> currentCards;
     private int roundPoints;
     private RoundPlayerStatus status;

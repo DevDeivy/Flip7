@@ -1,7 +1,5 @@
 package com.flip7.game.service;
 
-import com.flip7.game.DTO.DrawResultDTO;
-import com.flip7.game.DTO.StandResultDTO;
 import com.flip7.game.GameStatus;
 import com.flip7.game.RoundPlayerStatus;
 import com.flip7.game.model.Game;
@@ -12,6 +10,7 @@ import com.flip7.game.repository.PlayerRepository;
 import com.flip7.game.repository.RoundPlayerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -22,13 +21,18 @@ public class TurnService {
     private static final int POINTS_TO_WIN = 200;
     private static final int FLIP7_BONUS = 15;
     private static final int FLIP7_COUNT = 7;
+    private static final int FREEZE = 100;
+    private static final int FLIP_THREE = 101;
+    private static final int SECOND_CHANCE = 102;
+    private static final int X2 = 200;
 
     private final RoundPlayerRepository roundPlayerRepository;
     private final PlayerRepository playerRepository;
     private final GameRepository gameRepository;
     private final DeckService deckService;
 
-    public DrawResultDTO drawCard(Long gameId) {
+    @Transactional
+    public String drawCard(Long gameId) {
         Game game = gameRepository.findById(gameId)
                 .orElseThrow(() -> new RuntimeException("Partida no encontrada"));
 
@@ -44,48 +48,192 @@ public class TurnService {
 
         int card = deckService.drawCard(game);
 
-        DrawResultDTO result = new DrawResultDTO();
-        result.setPlayerName(currentPlayer.getName());
-        result.setCardDrawn(card);
+        if (isNumberCard(card)) {
+            return handleNumberCard(game, currentPlayer, roundPlayer, card);
+        }
+        if (card == FREEZE) {
+            return handleFreeze(game, currentPlayer, roundPlayer);
+        }
+        if (card == FLIP_THREE) {
+            return handleFlipThree(game, currentPlayer, roundPlayer);
+        }
+        if (card == SECOND_CHANCE) {
+            return handleSecondChance(game, currentPlayer, roundPlayer);
+        }
+        if (card >= 200) {
+            return handleModifierCard(game, currentPlayer, roundPlayer, card);
+        }
 
-        // Carta repetida -> eliminado
+        return "Carta desconocida.";
+    }
+
+    private String handleNumberCard(Game game, Player currentPlayer, RoundPlayer roundPlayer, int card) {
         if (roundPlayer.getCurrentCards().contains(card)) {
+            if (roundPlayer.isHasSecondChance()) {
+                roundPlayer.setHasSecondChance(false);
+                roundPlayerRepository.save(roundPlayer);
+                advanceTurn(game);
+                return "Segunda Oportunidad! " + currentPlayer.getName() + " se salvó del duplicado de " + card;
+            }
+
             roundPlayer.setStatus(RoundPlayerStatus.ELIMINATED);
             roundPlayer.setRoundPoints(0);
             roundPlayerRepository.save(roundPlayer);
-            result.setCurrentCards(roundPlayer.getCurrentCards());
-            result.setRoundPoints(0);
-            result.setStatus(RoundPlayerStatus.ELIMINATED);
-            result.setMessage("Carta repetida. " + currentPlayer.getName() + " ha sido eliminado.");
-            advanceTurn(game);
-            return result;
-        }
-
-        // Agregar carta
-        roundPlayer.getCurrentCards().add(card);
-        roundPlayer.setRoundPoints(roundPlayer.getRoundPoints() + card);
-
-        // Verificar Flip7
-        if (roundPlayer.getCurrentCards().size() == FLIP7_COUNT) {
-            roundPlayer.setRoundPoints(roundPlayer.getRoundPoints() + FLIP7_BONUS);
-            roundPlayer.setStatus(RoundPlayerStatus.STANDING);
-            roundPlayerRepository.save(roundPlayer);
-            result.setMessage("FLIP 7! " + currentPlayer.getName() + " completó 7 cartas.");
-            result.setStatus(RoundPlayerStatus.STANDING);
             advanceTurn(game);
             checkEndOfRound(game);
-            return result;
+            return "Carta repetida. " + currentPlayer.getName() + " ha sido eliminado.";
+        }
+
+        roundPlayer.getCurrentCards().add(card);
+        roundPlayer.setRoundPoints(calculateRawSum(roundPlayer));
+        roundPlayerRepository.save(roundPlayer);
+
+        if (getNumberCardCount(roundPlayer) == FLIP7_COUNT) {
+            int finalPoints = calculateRoundScore(roundPlayer);
+            roundPlayer.setRoundPoints(finalPoints);
+            roundPlayer.setStatus(RoundPlayerStatus.STANDING);
+            roundPlayerRepository.save(roundPlayer);
+            advanceTurn(game);
+            checkEndOfRound(game);
+            return "FLIP 7! " + currentPlayer.getName() + " completó 7 cartas.";
+        }
+
+        advanceTurn(game);
+        return currentPlayer.getName() + " sacó un " + card;
+    }
+
+    private String handleFreeze(Game game, Player currentPlayer, RoundPlayer roundPlayer) {
+        int score = calculateRoundScore(roundPlayer);
+        roundPlayer.setRoundPoints(score);
+        roundPlayer.setStatus(RoundPlayerStatus.STANDING);
+        roundPlayerRepository.save(roundPlayer);
+        advanceTurn(game);
+        checkEndOfRound(game);
+        return "FREEZE! " + currentPlayer.getName() + " se congela con " + score + " puntos.";
+    }
+
+    private String handleFlipThree(Game game, Player currentPlayer, RoundPlayer roundPlayer) {
+        StringBuilder sb = new StringBuilder("FLIP THREE! " + currentPlayer.getName() + " recibe: ");
+        boolean stopped = false;
+
+        for (int i = 0; i < 3; i++) {
+            if (deckService.isDeckEmpty(game)) break;
+            if (stopped) break;
+
+            int card = deckService.drawCard(game);
+            sb.append(card).append(" ");
+
+            if (isNumberCard(card)) {
+                boolean isDuplicate = roundPlayer.getCurrentCards().contains(card);
+
+                if (isDuplicate) {
+                    if (roundPlayer.isHasSecondChance()) {
+                        roundPlayer.setHasSecondChance(false);
+                        sb.append("(salvado) ");
+                    } else {
+                        roundPlayer.setStatus(RoundPlayerStatus.ELIMINATED);
+                        roundPlayer.setRoundPoints(0);
+                        stopped = true;
+                        sb.append("(duplicado!) ");
+                    }
+                } else {
+                    roundPlayer.getCurrentCards().add(card);
+                    roundPlayer.setRoundPoints(calculateRawSum(roundPlayer));
+
+                    if (getNumberCardCount(roundPlayer) >= FLIP7_COUNT) {
+                        int finalPoints = calculateRoundScore(roundPlayer);
+                        roundPlayer.setRoundPoints(finalPoints);
+                        roundPlayer.setStatus(RoundPlayerStatus.STANDING);
+                        stopped = true;
+                        sb.append("(FLIP 7!) ");
+                    }
+                }
+            } else if (card == FREEZE) {
+                roundPlayer.setStatus(RoundPlayerStatus.STANDING);
+                int score = calculateRoundScore(roundPlayer);
+                roundPlayer.setRoundPoints(score);
+                stopped = true;
+                sb.append("(FREEZE!) ");
+            } else if (card == SECOND_CHANCE && !roundPlayer.isHasSecondChance()) {
+                roundPlayer.setHasSecondChance(true);
+                sb.append("(Segunda Oportunidad) ");
+            } else if (card == FLIP_THREE) {
+                sb.append("(Flip Three anidado ignorado) ");
+            } else if (card >= 200) {
+                applyModifier(roundPlayer, card);
+                sb.append("(modificador) ");
+            }
         }
 
         roundPlayerRepository.save(roundPlayer);
-        result.setCurrentCards(roundPlayer.getCurrentCards());
-        result.setRoundPoints(roundPlayer.getRoundPoints());
-        result.setStatus(RoundPlayerStatus.ACTIVE);
-        result.setMessage(currentPlayer.getName() + " sacó un " + card);
-        return result;
+        advanceTurn(game);
+        checkEndOfRound(game);
+        return sb.toString();
     }
 
-    public StandResultDTO stand(Long gameId) {
+    private String handleSecondChance(Game game, Player currentPlayer, RoundPlayer roundPlayer) {
+        if (roundPlayer.isHasSecondChance()) {
+            advanceTurn(game);
+            return currentPlayer.getName() + " ya tenía una Segunda Oportunidad. La nueva se descarta.";
+        }
+
+        roundPlayer.setHasSecondChance(true);
+        roundPlayerRepository.save(roundPlayer);
+        advanceTurn(game);
+        return currentPlayer.getName() + " recibió una Segunda Oportunidad.";
+    }
+
+    private String handleModifierCard(Game game, Player currentPlayer, RoundPlayer roundPlayer, int card) {
+        applyModifier(roundPlayer, card);
+        roundPlayerRepository.save(roundPlayer);
+
+        String label = card == X2 ? "x2" : "+" + ((card - 200) * 2);
+        return currentPlayer.getName() + " recibió modificador " + label;
+    }
+
+    private void applyModifier(RoundPlayer roundPlayer, int card) {
+        if (card == X2) {
+            roundPlayer.setHasX2Multiplier(true);
+        } else if (card >= 201 && card <= 205) {
+            roundPlayer.setModifierBonus(roundPlayer.getModifierBonus() + (card - 200) * 2);
+        }
+        roundPlayer.getModifierCardValues().add(card);
+    }
+
+    private boolean isNumberCard(int card) {
+        return card >= 0 && card <= 12;
+    }
+
+    private int getNumberCardCount(RoundPlayer roundPlayer) {
+        return (int) roundPlayer.getCurrentCards().stream()
+                .filter(c -> c >= 0 && c <= 12)
+                .count();
+    }
+
+    private int calculateRawSum(RoundPlayer roundPlayer) {
+        return roundPlayer.getCurrentCards().stream()
+                .filter(c -> c >= 0 && c <= 12)
+                .mapToInt(Integer::intValue)
+                .sum();
+    }
+
+    private int calculateRoundScore(RoundPlayer roundPlayer) {
+        int sum = calculateRawSum(roundPlayer);
+        if (roundPlayer.isHasX2Multiplier()) {
+            sum *= 2;
+        }
+        sum += roundPlayer.getModifierBonus();
+
+        int numberCount = getNumberCardCount(roundPlayer);
+        if (numberCount >= FLIP7_COUNT) {
+            sum += FLIP7_BONUS;
+        }
+
+        return sum;
+    }
+
+    @Transactional
+    public String stand(Long gameId) {
         Game game = gameRepository.findById(gameId)
                 .orElseThrow(() -> new RuntimeException("Partida no encontrada"));
 
@@ -99,20 +247,17 @@ public class TurnService {
             throw new RuntimeException("Debes pedir al menos una carta antes de plantarte");
         }
 
-        if (roundPlayer.getStatus() == RoundPlayerStatus.ELIMINATED) throw new IllegalArgumentException("player was eliminated");
+        if (roundPlayer.getStatus() == RoundPlayerStatus.ELIMINATED)
+            throw new IllegalArgumentException("player was eliminated");
 
+        int score = calculateRoundScore(roundPlayer);
+        roundPlayer.setRoundPoints(score);
         roundPlayer.setStatus(RoundPlayerStatus.STANDING);
         roundPlayerRepository.save(roundPlayer);
 
-        StandResultDTO result = new StandResultDTO();
-        result.setPlayerName(currentPlayer.getName());
-        result.setRoundPoints(roundPlayer.getRoundPoints());
-        result.setTotalPoints(currentPlayer.getTotalPoints());
-        result.setMessage(currentPlayer.getName() + " se ha plantado con " + roundPlayer.getRoundPoints() + " puntos.");
-
         advanceTurn(game);
         checkEndOfRound(game);
-        return result;
+        return currentPlayer.getName() + " se ha plantado con " + score + " puntos.";
     }
 
     private void advanceTurn(Game game) {
@@ -120,7 +265,6 @@ public class TurnService {
         int total = players.size();
         int next = (game.getCurrentPlayerTurnIndex() + 1) % total;
 
-        // Saltar jugadores que ya no están activos en esta ronda
         List<RoundPlayer> roundPlayers = roundPlayerRepository
                 .findByGameIdAndRoundNumber(game.getId(), game.getCurrentRound());
 
@@ -131,7 +275,7 @@ public class TurnService {
                     .filter(rp -> rp.getPlayer().getId().equals(players.get(finalNext).getId()))
                     .findFirst()
                     .map(rp -> rp.getStatus() == RoundPlayerStatus.ACTIVE)
-                    .orElse(true); // si no tiene RoundPlayer aún, está activo
+                    .orElse(true);
 
             if (isActive) break;
             next = (next + 1) % total;
@@ -155,7 +299,6 @@ public class TurnService {
         );
 
         if (allDone) {
-            // Sumar puntos a quienes se plantaron
             roundPlayers.stream()
                     .filter(rp -> rp.getStatus() == RoundPlayerStatus.STANDING)
                     .forEach(rp -> {
@@ -164,14 +307,12 @@ public class TurnService {
                         playerRepository.save(player);
                     });
 
-            // Verificar ganador
             boolean hasWinner = game.getPlayers().stream()
                     .anyMatch(p -> p.getTotalPoints() >= POINTS_TO_WIN);
 
             if (hasWinner) {
                 game.setGameStatus(GameStatus.FINISHED);
             } else {
-                // Siguiente ronda
                 int nextStarting = (game.getStartingPlayerIndex() + 1) % game.getPlayers().size();
                 game.setStartingPlayerIndex(nextStarting);
                 game.setCurrentPlayerTurnIndex(nextStarting);
