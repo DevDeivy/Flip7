@@ -15,7 +15,7 @@ export function EventLog({ events }: EventLogProps) {
       </div>
 
       <div className="log-list custom-scrollbar">
-        {events.slice(0, 9).map((event) => (
+        {events.slice(0, 20).map((event) => (
           <motion.article
             key={event.id}
             layout
@@ -32,6 +32,9 @@ export function EventLog({ events }: EventLogProps) {
             </p>
           </motion.article>
         ))}
+        {events.length === 0 ? (
+          <p className="log-empty">Todavía no hay jugadas registradas.</p>
+        ) : null}
       </div>
     </section>
   );

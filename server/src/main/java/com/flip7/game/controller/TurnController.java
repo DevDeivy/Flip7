@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/flip/game")
+@RequestMapping({"/api/flip/game", "/api/flip/games"})
 @RequiredArgsConstructor
 public class TurnController {
 

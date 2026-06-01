@@ -2,6 +2,7 @@ package com.flip7.game.controller;
 
 import com.flip7.game.DTO.CreateGameDTO;
 import com.flip7.game.DTO.FullGameStateDTO;
+import com.flip7.game.DTO.PlayerDTO;
 import com.flip7.game.service.GameService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -13,8 +14,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
-@RequestMapping("/api/flip/game")
+@RequestMapping({"/api/flip/game", "/api/flip/games"})
 @RequiredArgsConstructor
 public class GameController {
 
@@ -29,5 +32,30 @@ public class GameController {
     @GetMapping("/{gameId}")
     public ResponseEntity<FullGameStateDTO> getGame(@PathVariable Long gameId) {
         return ResponseEntity.ok(gameService.getFullState(gameId));
+    }
+
+    @GetMapping("/{gameId}/state")
+    public ResponseEntity<FullGameStateDTO> getState(@PathVariable Long gameId) {
+        return ResponseEntity.ok(gameService.getFullState(gameId));
+    }
+
+    @PostMapping("/{gameId}/start")
+    public ResponseEntity<FullGameStateDTO> startGame(@PathVariable Long gameId) {
+        return ResponseEntity.ok(gameService.getFullState(gameId));
+    }
+
+    @GetMapping("/{gameId}/scoreboard")
+    public ResponseEntity<List<PlayerDTO>> getScoreboard(@PathVariable Long gameId) {
+        return ResponseEntity.ok(gameService.getScoreboard(gameId));
+    }
+
+    @GetMapping("/{gameId}/winner")
+    public ResponseEntity<PlayerDTO> getWinner(@PathVariable Long gameId) {
+        PlayerDTO winner = gameService.getWinner(gameId);
+        if (winner == null) {
+            return ResponseEntity.noContent().build();
+        }
+
+        return ResponseEntity.ok(winner);
     }
 }

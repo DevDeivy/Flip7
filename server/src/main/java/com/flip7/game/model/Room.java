@@ -1,6 +1,6 @@
 package com.flip7.game.model;
 
-import com.flip7.game.GameStatus;
+import com.flip7.game.RoomStatus;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -23,62 +23,32 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "game")
+@Table(name = "rooms")
 @Getter
 @Setter
 @NoArgsConstructor
-public class Game {
+public class Room {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, updatable = false)
-    private Instant createdAt = Instant.now();
+    @Column(nullable = false, unique = true, length = 8)
+    private String code;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private GameStatus gameStatus = GameStatus.WAITING;
+    private RoomStatus status = RoomStatus.WAITING;
 
     @Column(nullable = false)
-    private int currentRound = 1;
+    private String hostName;
 
-    @Column(nullable = false)
-    private int currentPlayerTurnIndex = 0;
-
-    @Column(nullable = false)
-    private int startingPlayerIndex = 0;
+    @Column(nullable = false, updatable = false)
+    private Instant createdAt = Instant.now();
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "winner_id")
-    private Player winner;
+    @JoinColumn(name = "game_id")
+    private Game game;
 
-    @OneToMany(mappedBy = "game", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Player> players = new ArrayList<>();
+    @OneToMany(mappedBy = "room", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private List<RoomParticipant> participants = new ArrayList<>();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -93,7 +93,6 @@ public class TurnService {
             roundPlayer.setRoundPoints(finalPoints);
             roundPlayer.setStatus(RoundPlayerStatus.STANDING);
             roundPlayerRepository.save(roundPlayer);
-            advanceTurn(game);
             checkEndOfRound(game);
             return "FLIP 7! " + currentPlayer.getName() + " completó 7 cartas.";
         }
@@ -290,6 +289,14 @@ public class TurnService {
         List<RoundPlayer> roundPlayers = roundPlayerRepository
                 .findByGameIdAndRoundNumber(game.getId(), game.getCurrentRound());
 
+        boolean someoneHasSevenCards = roundPlayers.stream()
+            .anyMatch(rp -> getNumberCardCount(rp) >= FLIP7_COUNT);
+
+        if (someoneHasSevenCards) {
+            finishRound(game, roundPlayers);
+            return;
+        }
+
         boolean allDone = game.getPlayers().stream().allMatch(player ->
                 roundPlayers.stream()
                         .filter(rp -> rp.getPlayer().getId().equals(player.getId()))
@@ -299,28 +306,40 @@ public class TurnService {
         );
 
         if (allDone) {
-            roundPlayers.stream()
-                    .filter(rp -> rp.getStatus() == RoundPlayerStatus.STANDING)
-                    .forEach(rp -> {
-                        Player player = rp.getPlayer();
-                        player.setTotalPoints(player.getTotalPoints() + rp.getRoundPoints());
-                        playerRepository.save(player);
-                    });
-
-            boolean hasWinner = game.getPlayers().stream()
-                    .anyMatch(p -> p.getTotalPoints() >= POINTS_TO_WIN);
-
-            if (hasWinner) {
-                game.setGameStatus(GameStatus.FINISHED);
-            } else {
-                int nextStarting = (game.getStartingPlayerIndex() + 1) % game.getPlayers().size();
-                game.setStartingPlayerIndex(nextStarting);
-                game.setCurrentPlayerTurnIndex(nextStarting);
-                game.setCurrentRound(game.getCurrentRound() + 1);
-            }
-
-            gameRepository.save(game);
+            finishRound(game, roundPlayers);
         }
+    }
+
+    private void finishRound(Game game, List<RoundPlayer> roundPlayers) {
+        roundPlayers.stream()
+                .filter(rp -> rp.getStatus() != RoundPlayerStatus.ELIMINATED)
+                .forEach(rp -> {
+                    if (rp.getStatus() != RoundPlayerStatus.STANDING) {
+                        rp.setRoundPoints(calculateRoundScore(rp));
+                        rp.setStatus(RoundPlayerStatus.STANDING);
+                        roundPlayerRepository.save(rp);
+                    }
+
+                    Player player = rp.getPlayer();
+                    player.setTotalPoints(player.getTotalPoints() + rp.getRoundPoints());
+                    playerRepository.save(player);
+                });
+
+        Player winner = game.getPlayers().stream()
+                .max((left, right) -> Integer.compare(left.getTotalPoints(), right.getTotalPoints()))
+                .orElse(null);
+
+        if (winner != null && winner.getTotalPoints() >= POINTS_TO_WIN) {
+            game.setGameStatus(GameStatus.FINISHED);
+            game.setWinner(winner);
+        } else {
+            int nextStarting = (game.getStartingPlayerIndex() + 1) % game.getPlayers().size();
+            game.setStartingPlayerIndex(nextStarting);
+            game.setCurrentPlayerTurnIndex(nextStarting);
+            game.setCurrentRound(game.getCurrentRound() + 1);
+        }
+
+        gameRepository.save(game);
     }
 
     private RoundPlayer createRoundPlayer(Player player, Game game) {
