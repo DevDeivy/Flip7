@@ -28,7 +28,7 @@ export function GameTable({ game, activePlayer, latestCardId, duplicateFlash }: 
         </div>
       </section>
 
-      <section className="tabletop" aria-label="Cartas del jugador en la mesa">
+      <section className="tabletop" aria-label="Cartas del jugador actual en este dispositivo">
         <div className="risk-halo" aria-hidden="true" />
 
         <div className="cards-row tabletop-row">
@@ -36,8 +36,8 @@ export function GameTable({ game, activePlayer, latestCardId, duplicateFlash }: 
             <PlayerHand player={activePlayer} latestCardId={latestCardId} isDuplicateFlash={duplicateFlash} />
           ) : (
             <div className="table-empty-state">
-              <span className="eyebrow">Mesa lista</span>
-              <span className="table-empty-copy">Roba para comenzar la ronda.</span>
+              <span className="eyebrow">Tu mano está lista</span>
+              <span className="table-empty-copy">Cuando te toque, roba para comenzar la ronda.</span>
             </div>
           )}
         </div>

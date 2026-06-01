@@ -104,3 +104,19 @@ export interface GameTestStateConfig {
   riskLevel?: number;
 }
 
+export interface RoomParticipantDTO {
+  id: string;
+  name: string;
+}
+
+export interface RoomStateDTO {
+  roomId: string;
+  code: string;
+  status: 'WAITING' | 'STARTED' | 'CLOSED';
+  hostName: string;
+  currentPlayers: number;
+  minimumPlayersToStart: number;
+  gameId: string | null;
+  participants: RoomParticipantDTO[];
+}
+

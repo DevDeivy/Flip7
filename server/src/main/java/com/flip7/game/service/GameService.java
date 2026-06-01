@@ -3,6 +3,7 @@ package com.flip7.game.service;
 import com.flip7.game.DTO.CreateGameDTO;
 import com.flip7.game.DTO.FullGameStateDTO;
 import com.flip7.game.DTO.FullPlayerStateDTO;
+import com.flip7.game.DTO.PlayerDTO;
 import com.flip7.game.GameStatus;
 import com.flip7.game.model.Deck;
 import com.flip7.game.model.Game;
@@ -10,11 +11,13 @@ import com.flip7.game.model.Player;
 import com.flip7.game.model.RoundPlayer;
 import com.flip7.game.repository.DeckRepository;
 import com.flip7.game.repository.GameRepository;
+import com.flip7.game.repository.PlayerRepository;
 import com.flip7.game.repository.RoundPlayerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 
@@ -25,21 +28,29 @@ public class GameService {
 
     private final GameRepository gameRepository;
     private final PlayerService playerService;
+    private final PlayerRepository playerRepository;
     private final DeckService deckService;
     private final DeckRepository deckRepository;
     private final RoundPlayerRepository roundPlayerRepository;
 
     @Transactional
     public FullGameStateDTO createGame(CreateGameDTO request) {
-        if (request.getPlayers().size() < 4 || request.getPlayers().size() > 8) {
+        return createGame(request.getPlayers());
+    }
+
+    @Transactional
+    public FullGameStateDTO createGame(List<String> playersRequest) {
+        if (playersRequest.size() < 4 || playersRequest.size() > 8) {
             throw new IllegalArgumentException("Debe haber entre 4 y 8 jugadores");
         }
 
         Game game = new Game();
+        game.setCreatedAt(Instant.now());
         game.setGameStatus(GameStatus.WAITING);
         gameRepository.save(game);
 
-        playerService.createPlayers(request.getPlayers(), game);
+        List<Player> createdPlayers = playerService.createPlayers(playersRequest, game);
+        game.setPlayers(createdPlayers);
 
         game.setGameStatus(GameStatus.PLAYING);
         gameRepository.save(game);
@@ -49,9 +60,16 @@ public class GameService {
         return getFullState(game.getId());
     }
 
+    public Game findGameById(Long gameId) {
+        return gameRepository.findById(gameId)
+                .orElseThrow(() -> new RuntimeException("Partida no encontrada"));
+    }
+
     public FullGameStateDTO getFullState(Long gameId) {
         Game game = gameRepository.findById(gameId)
                 .orElseThrow(() -> new RuntimeException("Partida no encontrada"));
+
+        List<Player> players = playerRepository.findByGameId(gameId);
 
         List<RoundPlayer> roundPlayers = roundPlayerRepository
                 .findByGameIdAndRoundNumber(game.getId(), game.getCurrentRound());
@@ -63,10 +81,13 @@ public class GameService {
         dto.setStatus(game.getGameStatus().name());
         dto.setCurrentRound(game.getCurrentRound());
         dto.setCurrentPlayerTurnIndex(game.getCurrentPlayerTurnIndex());
+        dto.setCurrentPlayerTurnId(players.isEmpty()
+            ? null
+            : players.get(game.getCurrentPlayerTurnIndex()).getId());
         dto.setStartingPlayerIndex(game.getStartingPlayerIndex());
         dto.setDeckRemaining(deck != null ? deck.getAvailableCards().size() : 0);
 
-        List<FullPlayerStateDTO> playerDTOs = game.getPlayers().stream()
+        List<FullPlayerStateDTO> playerDTOs = players.stream()
                 .map(player -> {
                     FullPlayerStateDTO p = new FullPlayerStateDTO();
                     p.setPlayerId(player.getId());
@@ -96,6 +117,58 @@ public class GameService {
                 .toList();
 
         dto.setPlayers(playerDTOs);
+        dto.setScoreboard(players.stream()
+                .map(player -> {
+                    PlayerDTO p = new PlayerDTO();
+                    p.setId(player.getId());
+                    p.setName(player.getName());
+                    p.setTotalPoints(player.getTotalPoints());
+                    return p;
+                })
+                .sorted(Comparator.comparingInt(PlayerDTO::getTotalPoints).reversed())
+                .toList());
+
+        if (game.getWinner() != null) {
+            Player winner = game.getWinner();
+            PlayerDTO winnerDto = new PlayerDTO();
+            winnerDto.setId(winner.getId());
+            winnerDto.setName(winner.getName());
+            winnerDto.setTotalPoints(winner.getTotalPoints());
+            dto.setWinner(winnerDto);
+        }
+
+        return dto;
+    }
+
+    public List<PlayerDTO> getScoreboard(Long gameId) {
+        gameRepository.findById(gameId)
+            .orElseThrow(() -> new RuntimeException("Partida no encontrada"));
+
+        return playerRepository.findByGameId(gameId).stream()
+                .map(player -> {
+                    PlayerDTO dto = new PlayerDTO();
+                    dto.setId(player.getId());
+                    dto.setName(player.getName());
+                    dto.setTotalPoints(player.getTotalPoints());
+                    return dto;
+                })
+                .sorted(Comparator.comparingInt(PlayerDTO::getTotalPoints).reversed())
+                .toList();
+    }
+
+    public PlayerDTO getWinner(Long gameId) {
+        Game game = gameRepository.findById(gameId)
+                .orElseThrow(() -> new RuntimeException("Partida no encontrada"));
+
+        if (game.getWinner() == null) {
+            return null;
+        }
+
+        Player winner = game.getWinner();
+        PlayerDTO dto = new PlayerDTO();
+        dto.setId(winner.getId());
+        dto.setName(winner.getName());
+        dto.setTotalPoints(winner.getTotalPoints());
         return dto;
     }
 

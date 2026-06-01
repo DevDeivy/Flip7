@@ -1,14 +1,49 @@
 import { create } from 'zustand';
 
 import { gameService } from '../services/gameService';
-import type { GameStateDTO } from '../types/game';
+import type { GameEventDTO, GameStateDTO, RoomStateDTO } from '../types/game';
+
+const DEFAULT_PLAYER_NAMES = ['Jugador 1', 'Jugador 2', 'Jugador 3', 'Jugador 4'];
+
+function mergeEvents(previousEvents: GameEventDTO[], incomingEvents: GameEventDTO[]): GameEventDTO[] {
+  if (incomingEvents.length === 0) {
+    return previousEvents;
+  }
+
+  const merged = [...incomingEvents, ...previousEvents];
+  const deduped = merged.filter((event, index, source) => {
+    if (index === 0) {
+      return true;
+    }
+
+    const previous = source[index - 1];
+    return !(previous.description === event.description && previous.playerName === event.playerName && previous.tone === event.tone);
+  });
+
+  return deduped.slice(0, 40);
+}
+
+function mergeGameState(previousGame: GameStateDTO | null, incomingGame: GameStateDTO): GameStateDTO {
+  return {
+    ...incomingGame,
+    events: mergeEvents(previousGame?.events ?? [], incomingGame.events),
+  };
+}
 
 interface GameStoreState {
   game: GameStateDTO | null;
+  room: RoomStateDTO | null;
   isBusy: boolean;
   error: string | null;
   hasInitialized: boolean;
+  lastPlayers: string[];
+  playerAlias: string;
+  createGame: (players: string[]) => Promise<void>;
   initializeGame: () => Promise<void>;
+  createRoom: (hostName: string) => Promise<void>;
+  joinRoom: (roomCode: string, playerName: string) => Promise<void>;
+  refreshRoom: () => Promise<void>;
+  startRoom: () => Promise<void>;
   drawCard: (_playerId?: string) => Promise<void>;
   stand: (_playerId?: string) => Promise<void>;
   nextRound: () => Promise<void>;
@@ -28,20 +63,117 @@ async function withGuard<T>(handler: () => Promise<T>, onError: (message: string
 
 export const useGameStore = create<GameStoreState>((set, get) => ({
   game: null,
+  room: null,
   isBusy: false,
   error: null,
   hasInitialized: false,
+  lastPlayers: DEFAULT_PLAYER_NAMES,
+  playerAlias: '',
 
-  initializeGame: async () => {
-    if (get().hasInitialized || get().isBusy) {
+  createGame: async (players: string[]) => {
+    const normalizedPlayers = players.map((player) => player.trim()).filter(Boolean);
+
+    if (normalizedPlayers.length < 4 || normalizedPlayers.length > 8) {
+      set({ error: 'Debes registrar entre 4 y 8 jugadores.' });
       return;
     }
 
     set({ isBusy: true, error: null });
 
     await withGuard(async () => {
-      const response = await gameService.startGame();
-      set({ game: response.game, hasInitialized: true });
+      const response = await gameService.createGame(normalizedPlayers);
+      set((state) => ({
+        game: mergeGameState(state.game, response.game),
+        room: null,
+        hasInitialized: true,
+        lastPlayers: normalizedPlayers,
+      }));
+    }, (message) => set({ error: message }))
+      .finally(() => set({ isBusy: false }));
+  },
+
+  initializeGame: async () => {
+    if (get().hasInitialized || get().isBusy) {
+      return;
+    }
+
+    await get().createGame(DEFAULT_PLAYER_NAMES);
+  },
+
+  createRoom: async (hostName: string) => {
+    const alias = hostName.trim();
+    if (!alias) {
+      set({ error: 'Debes ingresar tu nombre para crear una sala.' });
+      return;
+    }
+
+    set({ isBusy: true, error: null });
+
+    await withGuard(async () => {
+      const room = await gameService.createRoom(alias);
+      set({
+        room,
+        game: null,
+        playerAlias: alias,
+        hasInitialized: true,
+      });
+    }, (message) => set({ error: message }))
+      .finally(() => set({ isBusy: false }));
+  },
+
+  joinRoom: async (roomCode: string, playerName: string) => {
+    const code = roomCode.trim().toUpperCase();
+    const alias = playerName.trim();
+
+    if (!code || !alias) {
+      set({ error: 'Debes ingresar código de sala y nombre para unirte.' });
+      return;
+    }
+
+    set({ isBusy: true, error: null });
+
+    await withGuard(async () => {
+      const room = await gameService.joinRoom(code, alias);
+      set({
+        room,
+        game: null,
+        playerAlias: alias,
+        hasInitialized: true,
+      });
+    }, (message) => set({ error: message }))
+      .finally(() => set({ isBusy: false }));
+  },
+
+  refreshRoom: async () => {
+    const room = get().room;
+    if (!room) {
+      return;
+    }
+
+    await withGuard(async () => {
+      const refreshed = await gameService.getRoom(room.code);
+      if (refreshed.status === 'STARTED' && refreshed.gameId) {
+        const state = await gameService.getGame(refreshed.gameId);
+        set((current) => ({ game: mergeGameState(current.game, state.game), room: refreshed }));
+        return;
+      }
+
+      set({ room: refreshed });
+    }, (message) => set({ error: message }));
+  },
+
+  startRoom: async () => {
+    const room = get().room;
+    if (!room) {
+      return;
+    }
+
+    set({ isBusy: true, error: null });
+
+    await withGuard(async () => {
+      const response = await gameService.startRoom(room.code);
+      const refreshed = await gameService.getRoom(room.code);
+      set((state) => ({ game: mergeGameState(state.game, response.game), room: refreshed }));
     }, (message) => set({ error: message }))
       .finally(() => set({ isBusy: false }));
   },
@@ -62,8 +194,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set({ isBusy: true, error: null });
 
     await withGuard(async () => {
-      const response = await gameService.drawCard(targetPlayerId);
-      set({ game: response.game });
+      const response = await gameService.drawCard(game.gameId);
+      set((state) => ({ game: mergeGameState(state.game, response.game) }));
     }, (message) => set({ error: message }))
       .finally(() => set({ isBusy: false }));
   },
@@ -84,34 +216,35 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set({ isBusy: true, error: null });
 
     await withGuard(async () => {
-      const response = await gameService.stand(targetPlayerId);
-      set({ game: response.game });
+      const response = await gameService.stand(game.gameId);
+      set((state) => ({ game: mergeGameState(state.game, response.game) }));
     }, (message) => set({ error: message }))
       .finally(() => set({ isBusy: false }));
   },
 
   nextRound: async () => {
-    if (!get().game) {
+    const game = get().game;
+
+    if (!game) {
       return;
     }
 
     set({ isBusy: true, error: null });
 
     await withGuard(async () => {
-      const response = await gameService.nextRound();
-      set({ game: response.game });
+      const response = await gameService.getGame(game.gameId);
+      set((state) => ({ game: mergeGameState(state.game, response.game) }));
     }, (message) => set({ error: message }))
       .finally(() => set({ isBusy: false }));
   },
 
   restartGame: async () => {
-    set({ isBusy: true, error: null });
-
-    await withGuard(async () => {
-      const response = await gameService.restart();
-      set({ game: response.game, hasInitialized: true });
-    }, (message) => set({ error: message }))
-      .finally(() => set({ isBusy: false }));
+    set({
+      game: null,
+      room: null,
+      hasInitialized: false,
+      error: null,
+    });
   },
 
   dismissDuplicateAlert: () => {
