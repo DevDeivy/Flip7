@@ -94,10 +94,6 @@ public class GameService {
         List<RoundPlayer> roundPlayers = roundPlayerRepository
                 .findByGameIdAndRoundNumber(game.getId(), game.getCurrentRound());
 
-        if (roundPlayers.isEmpty() && game.getCurrentRound() > 1) {
-            roundPlayers = roundPlayerRepository.findByGameIdAndRoundNumber(game.getId(), game.getCurrentRound() - 1);
-        }
-
         final List<RoundPlayer> finalRoundPlayers = roundPlayers;
 
         Deck deck = deckRepository.findByGameId(gameId).orElse(null);

@@ -167,67 +167,13 @@ public class TurnService {
     }
 
     private String handleFlipThree(Game game, Player currentPlayer, RoundPlayer roundPlayer) {
-        StringBuilder sb = new StringBuilder("FLIP THREE! " + currentPlayer.getName() + " recibe: ");
-        boolean stopped = false;
-
-        for (int i = 0; i < 3; i++) {
-            if (deckService.isDeckEmpty(game)) break;
-            if (stopped) break;
-
-            int card = deckService.drawCard(game);
-            sb.append(card).append(" ");
-
-            if (isNumberCard(card)) {
-                boolean isDuplicate = roundPlayer.getCurrentCards().contains(card);
-
-                if (isDuplicate) {
-                    if (roundPlayer.isHasSecondChance()) {
-                        roundPlayer.setHasSecondChance(false);
-                        sb.append("(salvado) ");
-                    } else {
-                        roundPlayer.getCurrentCards().add(card);
-                        roundPlayer.setStatus(RoundPlayerStatus.ELIMINATED);
-                        roundPlayer.setRoundPoints(0);
-                        game.setLastDuplicateCard(card);
-                        game.setLastDuplicatePlayerId(currentPlayer.getId());
-                        stopped = true;
-                        sb.append("(duplicado!) ");
-                    }
-                } else {
-                    roundPlayer.getCurrentCards().add(card);
-                    roundPlayer.setRoundPoints(calculateRawSum(roundPlayer));
-
-                    if (getNumberCardCount(roundPlayer) >= FLIP7_COUNT) {
-                        int finalPoints = calculateRoundScore(roundPlayer);
-                        roundPlayer.setRoundPoints(finalPoints);
-                        roundPlayer.setStatus(RoundPlayerStatus.STANDING);
-                        stopped = true;
-                        sb.append("(FLIP 7!) ");
-                    }
-                }
-            } else if (card == FREEZE) {
-                roundPlayer.setStatus(RoundPlayerStatus.STANDING);
-                int score = calculateRoundScore(roundPlayer);
-                roundPlayer.setRoundPoints(score);
-                stopped = true;
-                sb.append("(FREEZE!) ");
-            } else if (card == SECOND_CHANCE && !roundPlayer.isHasSecondChance()) {
-                roundPlayer.setHasSecondChance(true);
-                sb.append("(Segunda Oportunidad) ");
-            } else if (card == FLIP_THREE) {
-                sb.append("(Flip Three anidado ignorado) ");
-            } else if (card >= 200) {
-                applyModifier(roundPlayer, card);
-                sb.append("(modificador) ");
-            }
-        }
-
-        roundPlayerRepository.save(roundPlayer);
-        advanceTurn(game);
-        checkEndOfRound(game);
-        String message = sb.toString();
+        String message = "FLIP THREE! " + currentPlayer.getName() + " obtuvo la carta especial (robos adicionales desactivados).";
         game.setLastMessage(message);
         gameRepository.save(game);
+
+        advanceTurn(game);
+        checkEndOfRound(game);
+
         return message;
     }
 
@@ -257,6 +203,10 @@ public class TurnService {
         String message = currentPlayer.getName() + " recibió modificador " + label;
         game.setLastMessage(message);
         gameRepository.save(game);
+
+        advanceTurn(game);
+        checkEndOfRound(game);
+
         return message;
     }
 

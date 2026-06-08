@@ -45,7 +45,7 @@ export function PlayerSidebar({ players, currentPlayerId }: PlayerSidebarProps) 
                   </div>
 
                   <p className="player-state">
-                    {getPlayerStatusLabel(player.status)} • Ronda {player.roundCards.length}
+                    {getPlayerStatusLabel(player.status)} • {player.roundCards.length} cartas
                   </p>
                 </div>
               </motion.article>
