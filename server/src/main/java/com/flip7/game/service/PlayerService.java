@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 @RequiredArgsConstructor
@@ -16,11 +17,17 @@ public class PlayerService {
     private final PlayerRepository playerRepository;
 
     public List<Player> createPlayers(List<String> names, Game game) {
-        List<Player> players = names.stream()
-                .map(name -> {
+        return createPlayers(names, game, false);
+    }
+
+    public List<Player> createPlayers(List<String> names, Game game, boolean markLastPlayerAsAi) {
+        List<Player> players = IntStream.range(0, names.size())
+                .mapToObj(index -> {
+                    String name = names.get(index);
                     Player player = new Player();
                     player.setName(name);
                     player.setTotalPoints(0);
+                    player.setAiControlled(markLastPlayerAsAi && index == names.size() - 1);
                     player.setGame(game);
                     return player;
                 })

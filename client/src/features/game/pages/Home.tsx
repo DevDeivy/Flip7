@@ -11,6 +11,11 @@ export function Home() {
     navigate('/multiplayer');
   }
 
+  function handleGoTo1vsIA() {
+    void restartGame();
+    navigate('/vs-ai');
+  }
+
   return (
     <div className="home-screen">
       <header className="home-topbar">
@@ -77,10 +82,10 @@ export function Home() {
             <div className="home-card-footer">
               <div className="home-feature home-feature-secondary">
                 <span className="material-symbols-outlined">model_training</span>
-                <span>Forja de Estrategia Activa</span>
+                <span>Partida 1 vs IA local</span>
               </div>
-              <button type="button" className="home-cta home-cta-secondary" disabled aria-disabled="true">
-                PROXIMAMENTE
+              <button type="button" className="home-cta home-cta-secondary" onClick={handleGoTo1vsIA}>
+                INICIAR PARTIDA
               </button>
             </div>
           </article>
@@ -90,7 +95,7 @@ export function Home() {
           <div className="home-ticker-track">
             <span>• MODO MULTIJUGADOR DISPONIBLE</span>
             <span>• NUEVOS PAQUETES DE CARTAS NEON OVERLOAD DISPONIBLES</span>
-            <span>• PRÓXIMAMENTE: MODO VS IA</span>
+            <span>• MODO VS IA DISPONIBLE CON OLLAMA</span>
             <span>• NUEVOS CARTAS ESPECIALES DISPONIBLES</span>
           </div>
         </section>

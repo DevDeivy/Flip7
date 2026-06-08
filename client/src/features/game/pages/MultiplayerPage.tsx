@@ -286,7 +286,7 @@ export function MultiplayerPage() {
                 onClick={() => void startRoom()}
                 disabled={isBusy || !canStart || !isHostViewer}
               >
-                <span className="material-symbols-outlined">{isHostViewer ? 'play_arrow' : 'hourglass_top'}</span>
+                <span className="material-symbols-outlined">play_arrow</span>
                 <span>
                   {isBusy
                     ? 'INICIANDO...'
@@ -321,6 +321,8 @@ export function MultiplayerPage() {
     );
   }
 
+  const activeGame = game!;
+
   return (
     <div className="arena-shell">
       <div className="arena-vignette" aria-hidden="true" />
@@ -331,7 +333,7 @@ export function MultiplayerPage() {
         <div className="topbar-meta-controls">
           <div className="table-meta">
             <span className="eyebrow">ID de mesa</span>
-            <span className="meta-value">#{String(game.gameId).slice(0, 6).toUpperCase()}</span>
+            <span className="meta-value">#{String(activeGame.gameId).slice(0, 6).toUpperCase()}</span>
           </div>
           <button type="button" className="secondary-action back-nav-action" onClick={handleExitToHome}>
             <span className="material-symbols-outlined">logout</span>
@@ -343,9 +345,9 @@ export function MultiplayerPage() {
       {error ? <div className="error-banner">{error}</div> : null}
 
       <main className="game-grid">
-        <PlayerSidebar players={game.players} currentPlayerId={game.currentTurnPlayerId} />
+        <PlayerSidebar players={activeGame.players} currentPlayerId={activeGame.currentTurnPlayerId} />
 
-        <GameTable game={game} activePlayer={viewerPlayer} latestCardId={latestCardId} duplicateFlash={false} />
+        <GameTable game={activeGame} activePlayer={viewerPlayer} latestCardId={latestCardId} duplicateFlash={false} />
 
         <aside className="sidebar sidebar-right">
           {canAct ? (
@@ -376,7 +378,7 @@ export function MultiplayerPage() {
             </section>
           )}
 
-          <EventLog events={game.events} />
+          <EventLog events={activeGame.events} viewerName={playerAlias} />
         </aside>
       </main>
 
@@ -384,12 +386,12 @@ export function MultiplayerPage() {
         <div className="footer-left">
           <div className="metric-line">
             <span className="eyebrow">Ronda</span>
-            <span className="metric-inline is-primary">{String(game.currentRound).padStart(2, '0')}</span>
+            <span className="metric-inline is-primary">{String(activeGame.currentRound).padStart(2, '0')}</span>
           </div>
           <span className="divider" aria-hidden="true" />
           <div className="metric-line">
             <span className="eyebrow">Cartas restantes</span>
-            <span className="metric-inline">{game.deck.length}</span>
+            <span className="metric-inline">{activeGame.deck.length}</span>
           </div>
         </div>
 
@@ -402,7 +404,7 @@ export function MultiplayerPage() {
         </div>
       </footer>
 
-      <WinnerModal game={game} open={game.gamePhase === 'winner'} onRestart={() => void restartGame()} />
+      <WinnerModal game={activeGame} open={activeGame.gamePhase === 'winner'} onRestart={() => void restartGame()} />
     </div>
   );
 }

@@ -20,5 +20,7 @@ public class FullGameStateDTO {
     private List<PlayerDTO> scoreboard;
     private int deckRemaining;
     private String lastMessage;
+    private String aiReason;
+    private DuplicateAlertDTO duplicateAlert;
     private PlayerDTO winner;
 }

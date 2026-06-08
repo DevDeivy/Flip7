@@ -149,6 +149,20 @@ El backend ya soporta crear sala, unirse y luego iniciar la partida.
 - `GET /api/flip/rooms/{code}` consulta estado del lobby
 - `POST /api/flip/rooms/{code}/start` inicia la partida con los jugadores de la sala
 
+## Modo 1 vs IA
+
+El backend también expone una partida directa contra la IA local conectada a Ollama.
+
+- `POST /api/flip/games/vs-ai` crea una partida humana vs bot
+- El backend consulta `http://localhost:11434` con el modelo `flip7-ai:latest`
+- La decisión de la IA se ejecuta en el backend como si fuera un jugador más
+
+Si necesitas cambiar la conexión, ajusta estas propiedades:
+
+- `ollama.base-url`
+- `ollama.model`
+- `ollama.timeout-ms`
+
 ## Notas útiles
 
 - El perfil por defecto usa H2 en memoria para que el backend levante sin dependencias externas.

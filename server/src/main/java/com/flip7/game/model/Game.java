@@ -48,6 +48,18 @@ public class Game {
     @Column(nullable = false)
     private int startingPlayerIndex = 0;
 
+    @Column(length = 1000)
+    private String lastMessage;
+
+    @Column(length = 1000)
+    private String aiReason;
+
+    @Column
+    private Integer lastDuplicateCard;
+
+    @Column
+    private Long lastDuplicatePlayerId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "winner_id")
     private Player winner;

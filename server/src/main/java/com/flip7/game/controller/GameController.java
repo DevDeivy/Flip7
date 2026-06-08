@@ -1,6 +1,7 @@
 package com.flip7.game.controller;
 
 import com.flip7.game.DTO.CreateGameDTO;
+import com.flip7.game.DTO.CreateAiGameDTO;
 import com.flip7.game.DTO.FullGameStateDTO;
 import com.flip7.game.DTO.PlayerDTO;
 import com.flip7.game.service.GameService;
@@ -27,6 +28,11 @@ public class GameController {
     public ResponseEntity<FullGameStateDTO> createGame(@RequestBody @Valid CreateGameDTO request) {
         FullGameStateDTO state = gameService.createGame(request);
         return ResponseEntity.ok(state);
+    }
+
+    @PostMapping("/vs-ai")
+    public ResponseEntity<FullGameStateDTO> createAiGame(@RequestBody @Valid CreateAiGameDTO request) {
+        return ResponseEntity.ok(gameService.createAiGame(request.getPlayerName()));
     }
 
     @GetMapping("/{gameId}")

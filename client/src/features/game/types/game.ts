@@ -11,7 +11,10 @@ export interface PlayerDTO {
   id: string;
   name: string;
   totalScore: number;
+  aiControlled?: boolean;
   roundCards: GameCardDTO[];
+  specialCards: GameCardDTO[];
+  hasSecondChance: boolean;
   status: PlayerStatus;
   hasTurn: boolean;
 }
@@ -67,6 +70,7 @@ export interface GameStateDTO {
   discard: GameCardDTO[];
   events: GameEventDTO[];
   riskLevel: number;
+  aiReason?: string;
   roundSummary: RoundSummaryDTO | null;
   duplicateAlert: DuplicateAlertDTO | null;
   winner: WinnerDTO | null;
@@ -85,6 +89,8 @@ export interface GameTestPlayerConfig {
   name: string;
   totalScore?: number;
   roundCards?: number[];
+  specialCards?: number[];
+  hasSecondChance?: boolean;
   status?: PlayerStatus;
   hasTurn?: boolean;
 }

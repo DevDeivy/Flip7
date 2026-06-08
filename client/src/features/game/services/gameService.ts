@@ -2,6 +2,7 @@ import { gameApi } from '../api/gameApi';
 
 export const gameService = {
   createGame: (players: string[]) => gameApi.createGame(players),
+  createAiGame: (playerName: string) => gameApi.createAiGame(playerName),
   getGame: (gameId: string) => gameApi.getGame(gameId),
   drawCard: (gameId: string) => gameApi.drawCard(gameId),
   stand: (gameId: string) => gameApi.stand(gameId),

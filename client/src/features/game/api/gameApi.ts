@@ -16,6 +16,7 @@ interface BackendPlayerStateDTO {
   playerId: number;
   name: string;
   totalPoints: number;
+  aiControlled?: boolean;
   roundCards: number[];
   status: 'ACTIVE' | 'STANDING' | 'ELIMINATED';
   hasSecondChance: boolean;
@@ -27,6 +28,7 @@ interface BackendPlayerDTO {
   id: number;
   name: string;
   totalPoints: number;
+  aiControlled?: boolean;
 }
 
 interface BackendGameStateDTO {
@@ -40,11 +42,22 @@ interface BackendGameStateDTO {
   scoreboard: BackendPlayerDTO[];
   deckRemaining: number;
   lastMessage?: string | null;
+  aiReason?: string | null;
+  duplicateAlert?: {
+    playerId: string;
+    playerName: string;
+    cardValue: number;
+    message: string;
+  } | null;
   winner?: BackendPlayerDTO | null;
 }
 
 interface CreateGameRequest {
   players: string[];
+}
+
+interface CreateAiGameRequest {
+  playerName: string;
 }
 
 interface BackendRoomParticipantDTO {
@@ -109,11 +122,72 @@ function mapWinner(winner: BackendPlayerDTO | null | undefined): WinnerDTO | nul
   };
 }
 
+function splitMessageSegments(message: string): string[] {
+  return message
+    .split(' | ')
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+}
+
+function extractPlayerName(segment: string): string | null {
+  const patterns = [
+    /^(.*) decide (?:hit|stand|play) porque /i,
+    /^(.*) sac[óo] un \d+$/i,
+    /^(.*) se ha plantado con \d+ puntos\.?$/i,
+    /^FREEZE! (.*) se congela con \d+ puntos\.?$/i,
+    /^FLIP 7! (.*) completó 7 cartas\.?$/i,
+    /^Carta repetida\. (.*) ha sido eliminado\.?$/i,
+    /^Segunda Oportunidad! (.*) se salvó del duplicado de \d+$/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = segment.match(pattern);
+    if (match) {
+      return match[1].trim();
+    }
+  }
+
+  return null;
+}
+
+function extractCardValue(segment: string): number | undefined {
+  const match = segment.match(/sac[óo] un (\d+)/i);
+  return match ? Number(match[1]) : undefined;
+}
+
+function buildEvent(message: string | null | undefined): GameEventDTO[] {
+  if (!message) {
+    return [];
+  }
+
+  const segments = splitMessageSegments(message);
+
+  return segments.map((segment, index) => ({
+    id: `event-${Date.now()}-${index}`,
+    timestamp: new Date().toISOString(),
+    title: 'Última jugada',
+    description: segment,
+    playerName: extractPlayerName(segment) ?? undefined,
+    value: extractCardValue(segment),
+    tone: /elimin|duplic|gan|freeze|plant|repetid/i.test(segment) ? 'warning' : 'primary',
+  }));
+}
+
 function mapCard(value: number, index: number, playerId: string): GameCardDTO {
   return {
     id: `${playerId}-${value}-${index}`,
     value,
   };
+}
+
+function mapSpecialCards(player: BackendPlayerStateDTO, playerId: string): GameCardDTO[] {
+  const specialCards = player.modifierCardValues.map((value, index) => mapCard(value, index, playerId));
+
+  if (player.hasSecondChance) {
+    specialCards.push(mapCard(102, specialCards.length, playerId));
+  }
+
+  return specialCards;
 }
 
 function mapPlayer(player: BackendPlayerStateDTO): PlayerDTO {
@@ -123,7 +197,10 @@ function mapPlayer(player: BackendPlayerStateDTO): PlayerDTO {
     id: playerId,
     name: player.name,
     totalScore: player.totalPoints,
+    aiControlled: player.aiControlled ?? false,
     roundCards: player.roundCards.map((value, index) => mapCard(value, index, playerId)),
+    specialCards: mapSpecialCards(player, playerId),
+    hasSecondChance: player.hasSecondChance,
     status: mapPlayerStatus(player.status),
     hasTurn: false,
   };
@@ -134,22 +211,6 @@ function getRiskLevel(players: PlayerDTO[], currentTurnPlayerId: string | null) 
   const uniqueCount = activePlayer?.roundCards.length ?? 0;
 
   return Math.min(100, Math.round((uniqueCount / 7) * 100));
-}
-
-function buildEvent(message: string | null | undefined): GameEventDTO[] {
-  if (!message) {
-    return [];
-  }
-
-  return [
-    {
-      id: `event-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      title: 'Última jugada',
-      description: message,
-      tone: /elimin|duplic|gan|freeze|plant/i.test(message) ? 'warning' : 'primary',
-    },
-  ];
 }
 
 function toClientGameState(state: BackendGameStateDTO): GameStateDTO {
@@ -177,8 +238,9 @@ function toClientGameState(state: BackendGameStateDTO): GameStateDTO {
     discard: [],
     events: buildEvent(state.lastMessage),
     riskLevel: getRiskLevel(players, currentTurnPlayerId),
+    aiReason: state.aiReason ?? undefined,
     roundSummary: null,
-    duplicateAlert: null,
+    duplicateAlert: state.duplicateAlert ?? null,
     winner: mapWinner(state.winner ?? null),
   };
 }
@@ -205,6 +267,11 @@ export const gameApi = {
     return { game: toClientGameState(response.data) };
   },
 
+  createAiGame: async (playerName: string): Promise<GameResponseDTO> => {
+    const response = await httpClient.post<BackendGameStateDTO>('/games/vs-ai', { playerName } satisfies CreateAiGameRequest);
+    return { game: toClientGameState(response.data) };
+  },
+
   getGame: async (gameId: string): Promise<GameResponseDTO> => {
     const response = await httpClient.get<BackendGameStateDTO>(`/games/${gameId}/state`);
     return { game: toClientGameState(response.data) };
@@ -226,6 +293,12 @@ export const gameApi = {
       id: String(player.id),
       name: player.name,
       totalScore: player.totalPoints,
+      aiControlled: player.aiControlled ?? false,
+      roundCards: [],
+      specialCards: [],
+      hasSecondChance: false,
+      status: 'playing' as const,
+      hasTurn: false,
     }));
   },
 

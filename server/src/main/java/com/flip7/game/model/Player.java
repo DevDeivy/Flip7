@@ -28,6 +28,9 @@ public class Player {
     @Column(nullable = false)
     private int totalPoints = 0;
 
+    @Column(nullable = false)
+    private boolean aiControlled = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "game_id", nullable = false)
     private Game game;

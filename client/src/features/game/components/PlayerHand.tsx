@@ -7,25 +7,30 @@ interface PlayerHandProps {
   player: PlayerDTO | undefined;
   latestCardId: string | null;
   isDuplicateFlash: boolean;
+  title?: string;
+  subtitle?: string;
+  className?: string;
 }
 
-export function PlayerHand({ player, latestCardId, isDuplicateFlash }: PlayerHandProps) {
-  const cards = player?.roundCards ?? [];
+export function PlayerHand({ player, latestCardId, isDuplicateFlash, title = 'Current Hand', subtitle, className }: PlayerHandProps) {
+  const cards = [...(player?.roundCards ?? []), ...(player?.specialCards ?? [])];
 
   return (
-    <section className="player-hand">
+    <section className={`player-hand ${className ?? ''}`}>
       <div className="section-caption">
-        <span className="eyebrow">Current Hand</span>
+        <span className="eyebrow">{title}</span>
         <span className="risk-label">{player?.name ?? 'Waiting'}</span>
       </div>
+
+      {subtitle ? <p className="hand-subtitle">{subtitle}</p> : null}
 
       <div className={`cards-row hand-row ${isDuplicateFlash ? 'duplicate-flash' : ''}`}>
         <AnimatePresence initial={false} mode="popLayout">
           {cards.length > 0 ? (
-              cards.map((card, index) => (
+            cards.map((card, index) => (
               <CardComponent
                 key={card.id}
-                  card={card}
+                card={card}
                 compact
                 isLatest={card.id === latestCardId || index === cards.length - 1}
               />

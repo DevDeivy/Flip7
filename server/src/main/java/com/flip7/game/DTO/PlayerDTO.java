@@ -9,4 +9,5 @@ public class PlayerDTO {
     private Long id;
     private String name;
     private int totalPoints;
+    private boolean aiControlled;
 }

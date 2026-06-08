@@ -21,6 +21,14 @@ export function DuplicateCardAlert({ alert, onClose }: DuplicateCardAlertProps) 
           >
             <p className="eyebrow">Alerta de duplicado</p>
             <h3>{alert.playerName}</h3>
+            
+            <div className="duplicate-visual">
+              <div className="duplicate-card-mini">
+                <span className="mini-value">{alert.cardValue}</span>
+                <span className="mini-label">REPETIDA</span>
+              </div>
+            </div>
+
             <p className="duplicate-copy">{alert.message}</p>
             <button type="button" className="secondary-action" onClick={onClose}>
               Reconocer

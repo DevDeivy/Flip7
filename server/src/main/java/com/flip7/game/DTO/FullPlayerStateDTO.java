@@ -16,4 +16,5 @@ public class FullPlayerStateDTO {
     private boolean hasSecondChance;
     private List<Integer> modifierCardValues;
     private int roundPoints;
+    private boolean aiControlled;
 }

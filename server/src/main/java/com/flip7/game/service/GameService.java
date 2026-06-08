@@ -25,6 +25,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class GameService {
     private static final int POINTS_TO_WIN = 200;
+    private static final String AI_PLAYER_NAME = "FLIP7 AI";
 
     private final GameRepository gameRepository;
     private final PlayerService playerService;
@@ -44,12 +45,22 @@ public class GameService {
             throw new IllegalArgumentException("Debe haber entre 4 y 8 jugadores");
         }
 
+        return createGameInternal(playersRequest, false);
+    }
+
+    @Transactional
+    public FullGameStateDTO createAiGame(String playerName) {
+        String normalizedPlayerName = normalizePlayerName(playerName);
+        return createGameInternal(List.of(normalizedPlayerName, AI_PLAYER_NAME), true);
+    }
+
+    private FullGameStateDTO createGameInternal(List<String> playersRequest, boolean markLastPlayerAsAi) {
         Game game = new Game();
         game.setCreatedAt(Instant.now());
         game.setGameStatus(GameStatus.WAITING);
         gameRepository.save(game);
 
-        List<Player> createdPlayers = playerService.createPlayers(playersRequest, game);
+        List<Player> createdPlayers = playerService.createPlayers(playersRequest, game, markLastPlayerAsAi);
         game.setPlayers(createdPlayers);
 
         game.setGameStatus(GameStatus.PLAYING);
@@ -58,6 +69,15 @@ public class GameService {
         deckService.createDeck(game);
 
         return getFullState(game.getId());
+    }
+
+    private String normalizePlayerName(String playerName) {
+        String normalized = playerName == null ? "" : playerName.trim();
+        if (normalized.isEmpty()) {
+            return "Jugador";
+        }
+
+        return normalized;
     }
 
     public Game findGameById(Long gameId) {
@@ -74,6 +94,12 @@ public class GameService {
         List<RoundPlayer> roundPlayers = roundPlayerRepository
                 .findByGameIdAndRoundNumber(game.getId(), game.getCurrentRound());
 
+        if (roundPlayers.isEmpty() && game.getCurrentRound() > 1) {
+            roundPlayers = roundPlayerRepository.findByGameIdAndRoundNumber(game.getId(), game.getCurrentRound() - 1);
+        }
+
+        final List<RoundPlayer> finalRoundPlayers = roundPlayers;
+
         Deck deck = deckRepository.findByGameId(gameId).orElse(null);
 
         FullGameStateDTO dto = new FullGameStateDTO();
@@ -86,6 +112,20 @@ public class GameService {
             : players.get(game.getCurrentPlayerTurnIndex()).getId());
         dto.setStartingPlayerIndex(game.getStartingPlayerIndex());
         dto.setDeckRemaining(deck != null ? deck.getAvailableCards().size() : 0);
+        dto.setLastMessage(game.getLastMessage());
+        dto.setAiReason(game.getAiReason());
+
+        if (game.getLastDuplicateCard() != null && game.getLastDuplicatePlayerId() != null) {
+            Player p = playerRepository.findById(game.getLastDuplicatePlayerId()).orElse(null);
+            if (p != null) {
+                com.flip7.game.DTO.DuplicateAlertDTO alert = new com.flip7.game.DTO.DuplicateAlertDTO();
+                alert.setPlayerId(String.valueOf(p.getId()));
+                alert.setPlayerName(p.getName());
+                alert.setCardValue(game.getLastDuplicateCard());
+                alert.setMessage("¡" + p.getName() + " sacó un " + game.getLastDuplicateCard() + " repetido y ha sido eliminado!");
+                dto.setDuplicateAlert(alert);
+            }
+        }
 
         List<FullPlayerStateDTO> playerDTOs = players.stream()
                 .map(player -> {
@@ -93,8 +133,9 @@ public class GameService {
                     p.setPlayerId(player.getId());
                     p.setName(player.getName());
                     p.setTotalPoints(player.getTotalPoints());
+                    p.setAiControlled(player.isAiControlled());
 
-                    RoundPlayer rp = roundPlayers.stream()
+                    RoundPlayer rp = finalRoundPlayers.stream()
                             .filter(r -> r.getPlayer().getId().equals(player.getId()))
                             .findFirst().orElse(null);
 
@@ -123,6 +164,7 @@ public class GameService {
                     p.setId(player.getId());
                     p.setName(player.getName());
                     p.setTotalPoints(player.getTotalPoints());
+                    p.setAiControlled(player.isAiControlled());
                     return p;
                 })
                 .sorted(Comparator.comparingInt(PlayerDTO::getTotalPoints).reversed())
@@ -134,6 +176,7 @@ public class GameService {
             winnerDto.setId(winner.getId());
             winnerDto.setName(winner.getName());
             winnerDto.setTotalPoints(winner.getTotalPoints());
+            winnerDto.setAiControlled(winner.isAiControlled());
             dto.setWinner(winnerDto);
         }
 

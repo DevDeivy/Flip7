@@ -39,6 +39,7 @@ interface GameStoreState {
   lastPlayers: string[];
   playerAlias: string;
   createGame: (players: string[]) => Promise<void>;
+  initializeAiGame: () => Promise<void>;
   initializeGame: () => Promise<void>;
   createRoom: (hostName: string) => Promise<void>;
   joinRoom: (roomCode: string, playerName: string) => Promise<void>;
@@ -87,6 +88,28 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         room: null,
         hasInitialized: true,
         lastPlayers: normalizedPlayers,
+      }));
+    }, (message) => set({ error: message }))
+      .finally(() => set({ isBusy: false }));
+  },
+
+  initializeAiGame: async () => {
+    if (get().hasInitialized || get().isBusy) {
+      return;
+    }
+
+    const alias = get().playerAlias.trim() || 'Jugador';
+
+    set({ isBusy: true, error: null });
+
+    await withGuard(async () => {
+      const response = await gameService.createAiGame(alias);
+      set((state) => ({
+        game: mergeGameState(state.game, response.game),
+        room: null,
+        hasInitialized: true,
+        lastPlayers: [alias, 'FLIP7 AI'],
+        playerAlias: alias,
       }));
     }, (message) => set({ error: message }))
       .finally(() => set({ isBusy: false }));
@@ -193,9 +216,46 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     set({ isBusy: true, error: null });
 
+    const pollForAiTurn = (gameId: string) => {
+      const poll = async () => {
+        try {
+          const refreshed = await gameService.getGame(gameId);
+          
+          set((state) => {
+            if (state.game?.gameId !== gameId) return state;
+            return { game: mergeGameState(state.game, refreshed.game) };
+          });
+
+          const nextTurnPlayer = refreshed.game.players.find((player) => player.hasTurn);
+          const isAiNext = nextTurnPlayer?.aiControlled;
+          const isRoundStillActive = refreshed.game.gamePhase === 'playing';
+
+          const currentState = get();
+
+          // Seguimos haciendo polling si es turno de la IA O si la ronda cambió pero el cliente aún no se enteró
+          if (isRoundStillActive && isAiNext) {
+            window.setTimeout(poll, 1200);
+          } else if (currentState.game && refreshed.game.currentRound !== currentState.game.currentRound) {
+            // Si la ronda cambió, forzamos una actualización final para que el jugador vea su turno
+            set({ game: mergeGameState(currentState.game, refreshed.game) });
+          }
+        } catch (err) {
+          console.error('Polling error:', err);
+          window.setTimeout(poll, 2000);
+        }
+      };
+
+      window.setTimeout(poll, 1200);
+    };
+
     await withGuard(async () => {
       const response = await gameService.drawCard(game.gameId);
       set((state) => ({ game: mergeGameState(state.game, response.game) }));
+
+      const currentTurnPlayer = response.game.players.find((player) => player.hasTurn);
+      if (response.game.gamePhase === 'playing' && currentTurnPlayer?.aiControlled) {
+        pollForAiTurn(response.game.gameId);
+      }
     }, (message) => set({ error: message }))
       .finally(() => set({ isBusy: false }));
   },
@@ -215,9 +275,37 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     set({ isBusy: true, error: null });
 
+    const pollForAiTurn = (gameId: string) => {
+      window.setTimeout(async () => {
+        try {
+          const refreshed = await gameService.getGame(gameId);
+
+          set((state) => {
+            if (state.game?.gameId !== gameId) {
+              return state;
+            }
+
+            return { game: mergeGameState(state.game, refreshed.game) };
+          });
+
+          const nextTurnPlayer = refreshed.game.players.find((player) => player.hasTurn);
+          if (refreshed.game.gamePhase === 'playing' && nextTurnPlayer?.aiControlled) {
+            pollForAiTurn(gameId);
+          }
+        } catch {
+          pollForAiTurn(gameId);
+        }
+      }, 1200);
+    };
+
     await withGuard(async () => {
       const response = await gameService.stand(game.gameId);
       set((state) => ({ game: mergeGameState(state.game, response.game) }));
+
+      const currentTurnPlayer = response.game.players.find((player) => player.hasTurn);
+      if (response.game.gamePhase === 'playing' && currentTurnPlayer?.aiControlled) {
+        pollForAiTurn(response.game.gameId);
+      }
     }, (message) => set({ error: message }))
       .finally(() => set({ isBusy: false }));
   },
@@ -243,6 +331,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       game: null,
       room: null,
       hasInitialized: false,
+      playerAlias: '',
       error: null,
     });
   },
