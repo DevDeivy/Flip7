@@ -30,7 +30,9 @@ Si hace falta, define `JAVA_HOME` apuntando a la carpeta del JDK 17 instalada y 
 
 Si ya tienes Java 17 instalado, solo asegúrate de que `java -version` muestre la versión 17 antes de seguir.
 
-Si `java -version` sigue mostrando otra versión, revisa qué JDK ve macOS con:
+Si `java -version` sigue mostrando otra versión en Windows, revisa variables de entorno (`JAVA_HOME` y `Path`) y vuelve a abrir la terminal.
+
+En macOS puedes revisar qué JDK está activo con:
 
 ```bash
 /usr/libexec/java_home -V
@@ -93,6 +95,28 @@ Si quieres usar PostgreSQL, puedes crear tu configuración local en
 - `src/main/java/com/flip7/game/repository`: repositorios de persistencia.
 - `src/main/java/com/flip7/game/DTO`: objetos de transferencia.
 - `src/main/java/com/flip7/game/config`: configuración de CORS y seguridad.
+- `src/main/java/com/flip7/game/exception`: manejo centralizado de errores HTTP.
+- `src/main/resources`: propiedades de aplicación por perfil.
+- `src/test/java/com/flip7/game`: pruebas unitarias, integración y utilidades de test.
+
+## Arquitectura backend
+
+El backend sigue una arquitectura por capas:
+
+- Capa API (`controller`): recibe requests, valida entrada y devuelve contratos HTTP.
+- Capa de aplicación (`service`): orquesta turnos, reglas de ronda, IA, salas y estado completo.
+- Capa de dominio (`model`): entidades del juego (`Game`, `Player`, `RoundPlayer`, `Deck`, `Room`).
+- Capa de persistencia (`repository`): acceso a base de datos con Spring Data JPA.
+- Capa de transporte (`DTO`): payloads de entrada/salida para separar dominio de API.
+
+## Lógica de juego (resumen)
+
+- Inicio de partida: creación de juego normal o modo `vs-ai`.
+- Turnos: cada jugador activo puede pedir carta (`draw`) o plantarse (`stand`).
+- Cartas especiales: FREEZE, FLIP THREE, SECOND CHANCE y modificadores (+2, +4, +6, +8, +10, x2).
+- Fin de ronda: ocurre cuando todos quedan `STANDING`/`ELIMINATED` o cuando se activa condición de cierre.
+- Puntuación: se acumula por ronda y gana quien alcance el umbral del juego.
+- Salas: lobby con código, unión de jugadores y arranque de partida al llegar al mínimo requerido.
 
 ## Versión y puertos
 
@@ -168,3 +192,102 @@ Si necesitas cambiar la conexión, ajusta estas propiedades:
 - El perfil por defecto usa H2 en memoria para que el backend levante sin dependencias externas.
 - CORS está abierto para facilitar el consumo desde el frontend.
 - Si usas PostgreSQL, crea/ajusta `src/main/resources/application-local.properties` y arranca con `--spring.profiles.active=local`.
+
+## Estrategia de testing backend
+
+La suite está organizada con enfoque por capas y por reglas de negocio:
+
+- Unit tests (Mockito + JUnit 5): validan reglas puras de negocio y ramas críticas.
+- Integration tests (SpringBootTest + MockMvc + H2): validan API REST, contratos HTTP y persistencia real.
+
+Estructura:
+
+```text
+src/test/java/com/flip7/game
+
+├── unit
+│   ├── DeckTest
+│   ├── DeckServiceTest
+│   ├── PlayerActionTest
+│   ├── PlayerServiceTest
+│   ├── RoundLifecycleTest
+│   ├── RoomServiceTest
+│   ├── ScoreCalculationTest
+│   ├── TurnManagementTest
+│   ├── TurnServiceSpecialCardsTest
+│   ├── ValidationTest
+│   └── WinnerTest
+│
+├── integration
+│   ├── GameControllerIT
+│   ├── TurnFlowIT
+│   ├── RoundFlowIT
+│   ├── WinnerFlowIT
+│   └── PersistenceIT
+│
+└── testutils
+	├── DeterministicDeckConfig
+	└── DeterministicDeckService
+```
+
+## Ejecución de tests y calidad
+
+Configuración implementada:
+
+- JaCoCo con reglas bundle-level de line/branch/class en 0.90.
+- PIT con mutadores STRONGER, umbral de mutación 90 y cobertura 90.
+- Profile de test con H2 (`src/test/resources/application-test.properties`).
+
+Comandos principales:
+
+```bash
+# Ejecuta todos los tests
+./gradlew test
+
+# Genera reportes de cobertura JaCoCo (HTML + XML)
+./gradlew jacocoTestReport
+
+# Verifica umbrales de cobertura configurados
+./gradlew jacocoTestCoverageVerification
+
+# Ejecuta mutation testing
+./gradlew pitest
+```
+
+## Dónde ver los reportes
+
+- JaCoCo HTML: `build/reports/jacoco/test/html/index.html`
+- JaCoCo XML: `build/reports/jacoco/test/jacocoTestReport.xml`
+- PIT HTML: `build/reports/pitest/index.html`
+- PIT XML: `build/reports/pitest/mutations.xml`
+
+## Estado de métricas
+
+Las métricas cambian según la rama y los cambios recientes.
+Para obtener valores reales y actualizados, ejecuta los comandos de la sección anterior y consulta los reportes generados.
+
+## Diagnóstico típico para mejorar cobertura/mutación
+
+- `TurnService`: ramas de flujo de turnos, fin de ronda y escenarios IA.
+- `RoomService`: caminos de éxito/colisión, capacidad y estados de sala.
+- `GameService`: mapeos completos de `getFullState`, scoreboard y winner.
+- `OllamaAiService`: respuestas inválidas, timeout y fallback.
+
+## Recomendación de trabajo incremental
+
+1. Agregar tests unitarios de `TurnService` para cubrir más combinaciones de estados activos/standing/eliminated por ronda.
+2. Añadir pruebas de `GameService` para `getFullState`, `getScoreboard` y `getWinner` con casos límite y nulos.
+3. Expandir `RoomService` para rutas exitosas completas (create/join/start) y conflictos adicionales.
+4. Añadir pruebas PIT-killer para fronteras exactas: `>=` vs `>`, conteo de 7 cartas, y negaciones de condiciones.
+
+## pom.xml de referencia
+
+Se incluye un `pom.xml` de referencia en la raíz de `server` con dependencias y plugins para:
+
+- JUnit 5
+- Mockito
+- MockMvc (vía `spring-boot-starter-test`)
+- JaCoCo (umbral 0.90)
+- PIT (umbral 90)
+
+El build activo del proyecto sigue siendo Gradle (`build.gradle`).

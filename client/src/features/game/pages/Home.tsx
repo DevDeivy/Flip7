@@ -65,7 +65,7 @@ export function Home() {
             </div>
           </article>
 
-          <article className="home-card home-card-secondary home-card-disabled" aria-disabled="true">
+          <article className="home-card home-card-secondary">
             <div className="home-card-icon" aria-hidden="true">
               <span className="material-symbols-outlined">memory</span>
             </div>
@@ -104,7 +104,7 @@ export function Home() {
       <footer className="home-footer">
         <div className="home-footer-brand">
           <div>FLIP7</div>
-          <p>© 2024 FLIP7 DIGITAL. ASCIENDE EN EL TABLERO.</p>
+          <p>© 2026 FLIP7 DIGITAL. ASCIENDE EN EL TABLERO.</p>
         </div>
         <nav className="home-footer-nav" aria-label="Enlaces de pie de pagina">
           <a href="#" onClick={(event) => event.preventDefault()}>COMUNIDAD</a>

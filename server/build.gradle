@@ -2,6 +2,8 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '4.0.6'
 	id 'io.spring.dependency-management' version '1.1.7'
+	id 'jacoco'
+	id 'info.solidsoft.pitest' version '1.19.0-rc.2'
 }
 
 group = 'com.flip7'
@@ -31,6 +33,9 @@ def deleteAppleDoubleArtifacts = {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-security'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.boot:spring-boot-test-autoconfigure'
+	testImplementation 'com.fasterxml.jackson.core:jackson-databind'
+	testImplementation 'org.mockito:mockito-junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
@@ -44,6 +49,7 @@ dependencies {
 
 	testAnnotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'com.h2database:h2'
+	testImplementation 'org.pitest:pitest-junit5-plugin:1.2.2'
 }
 
 tasks.named('test') {
@@ -51,6 +57,64 @@ tasks.named('test') {
 		deleteAppleDoubleArtifacts()
 	}
 	useJUnitPlatform()
+	finalizedBy(tasks.named('jacocoTestReport'))
+}
+
+jacoco {
+	toolVersion = '0.8.12'
+}
+
+tasks.named('jacocoTestReport') {
+	dependsOn(tasks.named('test'))
+	reports {
+		xml.required = true
+		html.required = true
+	}
+}
+
+tasks.named('jacocoTestCoverageVerification') {
+	dependsOn(tasks.named('test'))
+	violationRules {
+		rule {
+			element = 'BUNDLE'
+			limit {
+				counter = 'LINE'
+				value = 'COVEREDRATIO'
+				minimum = 0.90
+			}
+			limit {
+				counter = 'BRANCH'
+				value = 'COVEREDRATIO'
+				minimum = 0.90
+			}
+			limit {
+				counter = 'CLASS'
+				value = 'COVEREDRATIO'
+				minimum = 0.90
+			}
+		}
+	}
+}
+
+tasks.named('check') {
+	dependsOn(tasks.named('jacocoTestCoverageVerification'))
+}
+
+pitest {
+	pitestVersion = '1.17.3'
+	targetClasses = ['com.flip7.game.service.*', 'com.flip7.game.model.*']
+	excludedClasses = ['com.flip7.game.service.OllamaAiService*']
+	targetTests = ['com.flip7.game.unit.*', 'com.flip7.game.integration.*']
+	mutators = ['STRONGER']
+	threads = 1
+	timeoutFactor = 6.0
+	outputFormats = ['HTML', 'XML']
+	timestampedReports = false
+	junit5PluginVersion = '1.2.2'
+	useClasspathFile = true
+	mutationThreshold = 90
+	coverageThreshold = 90
+	failWhenNoMutations = false
 }
 
 tasks.named('clean') {
