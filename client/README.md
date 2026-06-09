@@ -12,6 +12,7 @@ La aplicación consume un backend real vía HTTP y soporta flujo completo de Hom
 - Axios (cliente HTTP)
 - Framer Motion (animaciones)
 - Playwright Test (E2E)
+- Cucumber + Playwright (pruebas funcionales)
 
 ## Arquitectura
 
@@ -36,8 +37,39 @@ Desde `client/`:
 - `npm run test:e2e:headed`: ejecutar E2E con navegador visible.
 - `npm run test:e2e:report`: abrir reporte HTML ya generado.
 - `npm run test:e2e:full`: ejecutar pruebas y abrir reporte al final.
+- `npm run test:functional`: ejecutar pruebas funcionales BDD (Cucumber + Playwright) sin mocks (levanta backend y frontend automaticamente).
+- `npm run test:functional:report`: abrir el reporte HTML de la ultima ejecucion funcional.
 
 ## Playwright E2E (Frontend)
+
+La suite en `tests/game/` es determinística y útil para regresión rápida de UI.
+
+## Pruebas funcionales (Cucumber + Playwright)
+
+La suite funcional BDD está en `tests/functional/` y valida flujo real de UI consumiendo backend real, sin inyección de estado de prueba.
+
+Ubicación de pruebas funcionales:
+
+```text
+tests/
+	functional/
+		features/
+		steps/
+```
+
+Ejecución:
+
+```bash
+npm run test:functional
+```
+
+Nota: este comando inicia backend y frontend automaticamente y los apaga al terminar.
+
+El reporte HTML se genera en `cucumber-report/index.html`. Para abrirlo:
+
+```bash
+npm run test:functional:report
+```
 
 La configuración está en `playwright.config.ts` con:
 
