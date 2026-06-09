@@ -1,82 +1,92 @@
 # FLIP7 Frontend
 
-Frontend del juego FLIP7 construido con React, TypeScript, Vite, TailwindCSS, Zustand y Framer Motion. La interfaz incluye simulación local completa del gameplay para trabajar sin backend real y está preparada para conectarse a una API más adelante.
+Frontend de FLIP7 construido con React, TypeScript y Vite.
+La aplicación consume un backend real vía HTTP y soporta flujo completo de Home, lobby multijugador y partida.
+
+## Stack
+
+- React 19
+- TypeScript
+- Vite
+- Zustand (estado global)
+- Axios (cliente HTTP)
+- Framer Motion (animaciones)
+- Playwright Test (E2E)
 
 ## Arquitectura
 
-La pantalla principal vive en `src/features/game/pages/GamePage.tsx`, pero la lógica está separada por capas:
+La lógica del frontend está organizada por capas dentro de `src/features/game/`:
 
-- `src/features/game/engine/`: reglas puras del juego, baraja, turnos, puntuación y resolución de rondas.
-- `src/features/game/api/`: capa de acceso preparada para backend real.
-- `src/features/game/services/`: fachada de servicios que consume la UI.
-- `src/features/game/mocks/`: repositorio local determinista para simular respuestas de servidor.
-- `src/features/game/store/`: estado global con Zustand.
-- `src/features/game/components/`: piezas visuales reutilizables.
-- `src/features/game/hooks/`: hooks de lectura y acciones.
-- `src/features/game/utils/`: utilidades de presentación y etiquetas en español.
-
-## Juego local
-
-El frontend corre completamente con estado local y una simulación mock del backend. La app soporta:
-
-- 4 jugadores.
-- rotación de turnos.
-- robar carta.
-- plantarse.
-- eliminación por carta duplicada.
-- cierre automático de ronda.
-- resumen de ronda.
-- detección de ganador a partir de 200 puntos.
-
-Para pruebas e2e, Playwright puede inyectar estados deterministas con `window.__FLIP7_TEST__`.
+- `api/`: integración HTTP con backend real (`gameApi.ts`, `httpClient.ts`).
+- `services/`: fachada de negocio que consume la UI.
+- `store/`: estado global (Zustand) y acciones asíncronas.
+- `pages/`: pantallas (`Home.tsx`, `MultiplayerPage.tsx`, `vsAI.tsx`).
+- `components/`: componentes visuales reutilizables.
+- `types/`: contratos TypeScript de datos y estado.
+- `utils/`: etiquetas y utilidades de presentación.
 
 ## Scripts
 
 Desde `client/`:
 
-- `npm run dev` para levantar Vite en desarrollo.
-- `npm run build` para compilar producción.
-- `npm run lint` para revisar el código.
-- `npm run test:e2e` para ejecutar Playwright.
-- `npm run test:e2e:headed` para ejecutar Playwright con navegador visible.
+- `npm run dev`: iniciar frontend en desarrollo.
+- `npm run build`: build de producción.
+- `npm run lint`: análisis estático.
+- `npm run test:e2e`: ejecutar suite E2E de Playwright.
+- `npm run test:e2e:headed`: ejecutar E2E con navegador visible.
+- `npm run test:e2e:report`: abrir reporte HTML ya generado.
+- `npm run test:e2e:full`: ejecutar pruebas y abrir reporte al final.
 
-## Tests
+## Playwright E2E (Frontend)
 
-La suite de Playwright vive en `tests/game/` y cubre el flujo completo del juego:
+La configuración está en `playwright.config.ts` con:
 
-- ronda normal.
-- eliminación de todos los jugadores.
-- duplicado y alerta de eliminación.
-- acción de plantarse.
-- rotación de turnos.
-- detección de ganador.
-- reinicio de ronda.
+- `retries` (en CI)
+- `trace: on-first-retry`
+- `screenshot: only-on-failure`
+- `video: retain-on-failure`
+- `reporter: html`
 
-Los tests usan selectores estables con `data-testid` para mantenerlos robustos y fáciles de extender.
-
-## Estructura del proyecto
+Ubicación de pruebas:
 
 ```text
-src/
-	features/game/
-		api/
-		components/
-		engine/
-		hooks/
-		mocks/
-		pages/
-		services/
-		store/
-		types/
-		utils/
 tests/
 	fixtures/
 	game/
 	helpers/
 ```
 
-## Notas de desarrollo
+## Cómo generar reporte de pruebas frontend
 
-- El cliente ya está separado del backend.
-- No mezcles lógica de juego dentro de los componentes visuales.
-- Si luego conectas una API real, la capa de `services` y `api` está lista para reemplazar el mock sin rehacer la UI.
+1. Asegura dependencias e instalación de navegadores Playwright:
+
+```bash
+npm install
+npx playwright install
+```
+
+2. Levanta el backend real en `http://localhost:8080`.
+
+3. Ejecuta pruebas E2E frontend:
+
+```bash
+npm run test:e2e
+```
+
+4. Abre el reporte HTML:
+
+```bash
+npm run test:e2e:report
+```
+
+El reporte se genera en `playwright-report/`.
+
+## Ejecución rápida (todo en uno)
+
+```bash
+npm run test:e2e:full
+```
+
+## Nota importante
+
+Estas pruebas validan frontend consumiendo backend real. Si el backend no está activo o no responde en `localhost:8080`, los escenarios E2E fallarán.

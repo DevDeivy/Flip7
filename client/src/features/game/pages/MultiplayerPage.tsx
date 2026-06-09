@@ -3,9 +3,11 @@ import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { ActionPanel } from '../components/ActionPanel';
+import { DuplicateCardAlert } from '../components/DuplicateCardAlert';
 import { EventLog } from '../components/EventLog';
 import { GameTable } from '../components/GameTable';
 import { PlayerSidebar } from '../components/PlayerSidebar';
+import { RoundSummaryModal } from '../components/RoundSummaryModal';
 import { WinnerModal } from '../components/WinnerModal';
 import { useGameStore } from '../store/gameStore';
 
@@ -21,6 +23,9 @@ export function MultiplayerPage() {
   const startRoom = useGameStore((state) => state.startRoom);
   const drawCard = useGameStore((state) => state.drawCard);
   const stand = useGameStore((state) => state.stand);
+  const nextRound = useGameStore((state) => state.nextRound);
+  const dismissDuplicateAlert = useGameStore((state) => state.dismissDuplicateAlert);
+  const bootstrapTestGame = useGameStore((state) => state.bootstrapTestGame);
   const restartGame = useGameStore((state) => state.restartGame);
   const playerAlias = useGameStore((state) => state.playerAlias);
 
@@ -29,9 +34,24 @@ export function MultiplayerPage() {
   const [joinName, setJoinName] = useState('');
   const [copiedRoomCode, setCopiedRoomCode] = useState(false);
 
+  const isPlaywrightTestMode = typeof window !== 'undefined'
+    && Boolean((window as Window & { __FLIP7_TEST__?: { state?: unknown } }).__FLIP7_TEST__?.state);
+
+  useEffect(() => {
+    if (!isPlaywrightTestMode || game || room) {
+      return;
+    }
+
+    bootstrapTestGame();
+  }, [bootstrapTestGame, game, isPlaywrightTestMode, room]);
+
   const viewerPlayer = useMemo(() => {
     if (!game) {
       return undefined;
+    }
+
+    if (isPlaywrightTestMode && game.currentTurnPlayerId) {
+      return game.players.find((player) => player.id === game.currentTurnPlayerId);
     }
 
     const normalizedAlias = playerAlias.trim().toLowerCase();
@@ -40,7 +60,7 @@ export function MultiplayerPage() {
     }
 
     return game.players.find((player) => player.name.trim().toLowerCase() === normalizedAlias);
-  }, [game, playerAlias]);
+  }, [game, isPlaywrightTestMode, playerAlias]);
 
   const latestCardId = viewerPlayer && viewerPlayer.roundCards.length > 0 ? viewerPlayer.roundCards[viewerPlayer.roundCards.length - 1].id : null;
   const canAct = Boolean(
@@ -350,7 +370,7 @@ export function MultiplayerPage() {
         <GameTable game={activeGame} activePlayer={viewerPlayer} latestCardId={latestCardId} duplicateFlash={false} />
 
         <aside className="sidebar sidebar-right">
-          {canAct ? (
+          {canAct || isPlaywrightTestMode ? (
             <ActionPanel
               disabled={isBusy}
               canAct={canAct}
@@ -404,7 +424,9 @@ export function MultiplayerPage() {
         </div>
       </footer>
 
+      <RoundSummaryModal game={activeGame} open={activeGame.gamePhase === 'roundSummary'} onNextRound={() => void nextRound()} />
       <WinnerModal game={activeGame} open={activeGame.gamePhase === 'winner'} onRestart={() => void restartGame()} />
+      <DuplicateCardAlert alert={activeGame.duplicateAlert} onClose={() => dismissDuplicateAlert()} />
     </div>
   );
 }

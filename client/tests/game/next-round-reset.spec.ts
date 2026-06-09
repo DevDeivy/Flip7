@@ -20,7 +20,7 @@ test('next round clears round cards but preserves total scores and rotates the s
   await expect(page.getByTestId('player-card-satoshi')).toContainText('4');
   await page.getByTestId('next-round-button').click();
 
-  await expect(page.getByText('02')).toBeVisible();
+  await expect(page.locator('.metric-inline.is-primary')).toHaveText('02');
   await expect(page.getByText('0 / 7')).toBeVisible();
   await expect(page.getByText('Roba para comenzar la ronda.')).toBeVisible();
   await expectActivePlayer(page, 'Ada');

@@ -58,8 +58,8 @@ export async function startMockGame(page: Page, state: GameTestStateConfig) {
     window.__FLIP7_TEST__ = { state: config };
   }, state);
 
-  await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'FLIP7' })).toBeVisible();
+  await page.goto('/multiplayer');
+
   await expect(page.getByTestId('event-log')).toBeVisible();
 }
 
