@@ -11,7 +11,7 @@ El proyecto fue construido siguiendo una arquitectura Full Stack compuesta por:
 * Persistencia de datos mediante base de datos.
 * Pruebas automatizadas de distintos niveles.
 * Integración real entre frontend y backend.
-* Modo multijugador y modo contra Inteligencia Artificial.
+* Modo multijugador y modo contra Inteligencia Artificial (Ollama).
 
 El objetivo del proyecto no fue únicamente desarrollar un sistema funcional, sino también aplicar principios de ingeniería de software, diseño orientado a objetos, automatización de pruebas y buenas prácticas de desarrollo.
 
@@ -19,9 +19,10 @@ El objetivo del proyecto no fue únicamente desarrollar un sistema funcional, si
 
 # Integrantes
 
-* Erik Valencia Cardona
-* [Agregar integrantes]
-* Asesor temático: [Agregar nombre]
+* Luis David Mora
+* Erik Valencia
+* Deivy Lujan
+* Daniel Cabana
 
 ---
 
@@ -39,6 +40,7 @@ Este proyecto busca demostrar conocimientos en:
 * Programación orientada a objetos.
 * Principios SOLID.
 * Arquitecturas mantenibles y escalables.
+* Integración de Modelos de Lenguaje (LLMs) locales.
 
 ---
 
@@ -52,6 +54,7 @@ Este proyecto busca demostrar conocimientos en:
 * Gradle
 * H2 Database
 * PostgreSQL (opcional)
+* **Ollama** (Motor de Inteligencia Artificial local)
 
 ### Pruebas Backend
 
@@ -121,6 +124,22 @@ Responsable del acceso a base de datos mediante Spring Data JPA.
 
 ---
 
+## Arquitectura de Inteligencia Artificial (Ollama)
+
+El sistema integra un modelo de lenguaje local para la toma de decisiones en tiempo real.
+
+*   **OllamaAiService**: Servicio encargado de la comunicación con la API de Ollama mediante `HttpClient`.
+*   **Prompt Engineering**: Se utiliza un `system prompt` estructurado para definir el comportamiento de la IA y asegurar respuestas en formato JSON estricto.
+*   **Modelo**: Basado en `qwen2.5:7b`, optimizado mediante un `Modelfile` personalizado (`flip7-ai`).
+*   **Flujo de Decisión**:
+    1.  El `TurnService` identifica el turno de un jugador controlado por IA.
+    2.  Se recopila el estado actual de la partida (cartas en mano, puntos, mazo restante, estado del oponente).
+    3.  Se envía el contexto a Ollama.
+    4.  La IA devuelve una decisión (`hit` o `stand`) junto con un razonamiento.
+    5.  El sistema ejecuta la acción y almacena el razonamiento para visualización en el frontend.
+
+---
+
 ## Arquitectura Frontend
 
 El frontend utiliza una arquitectura basada en funcionalidades.
@@ -140,7 +159,7 @@ El frontend es responsable únicamente de:
 
 * Representación visual.
 * Interacción con el usuario.
-* Experiencia de usuario.
+* Experiencia de usuario (incluyendo feedback de la IA).
 
 Toda la lógica del juego se encuentra implementada en el backend.
 
@@ -168,6 +187,7 @@ Se implementa:
 * Rotación de jugadores.
 * Validación de acciones permitidas.
 * Omisión de jugadores eliminados o plantados.
+* **Ejecución automática de turnos de IA**.
 
 ---
 
@@ -236,219 +256,239 @@ Cada carta incluye:
 
 ## Inteligencia Artificial
 
-El proyecto incluye un modo de juego contra IA.
+El proyecto incluye un modo de juego contra IA potenciado por **Ollama**.
 
 La IA:
 
 * Analiza el estado actual de la partida.
-* Evalúa riesgo y recompensa.
-* Toma decisiones automáticas.
-* Participa como un jugador adicional.
+* Evalúa riesgo y recompensa basándose en el mazo restante y puntos actuales.
+* Toma decisiones automáticas (`Hit` o `Stand`).
+* Proporciona un razonamiento textual de su decisión.
+* Participa como un jugador adicional en tiempo real.
 
 ---
 
 # Estructura General del Proyecto
 
-```text
-Flip7/
-│
-├── client/
-│   ├── src/
-│   ├── tests/
-│   ├── package.json
-│   └── playwright.config.ts
-│
-├── server/
-│   ├── src/main/java
-│   ├── src/test/java
-│   ├── build.gradle
-│   └── gradlew
-│
-└── README.md
-```
+```text 
+Flip7/ 
+│ 
+├── agent/ 
+│   └── Modelfile           # Configuración del modelo de Ollama 
+│ 
+├── client/ 
+│   ├── src/ 
+│   ├── tests/ 
+│   ├── package.json 
+│   └── playwright.config.ts 
+│ 
+├── server/ 
+│   ├── src/main/java 
+│   ├── src/test/java 
+│   ├── build.gradle 
+│   └── gradlew 
+│ 
+└── README.md 
+``` 
 
 ---
 
 # Cómo Ejecutar el Proyecto
 
-## 1. Ejecutar Backend
+## 1. Configurar Ollama (IA)
+
+Es necesario tener instalado [Ollama](https://ollama.com/) en el sistema.
+
+1.  Descargar el modelo base:
+    ```bash
+    ollama pull qwen2.5:7b
+    ```
+2.  Crear el modelo personalizado para Flip7:
+    ```bash
+    cd agent
+    ollama create flip7-ai -f Modelfile
+    ```
+
+## 2. Ejecutar Backend
 
 Desde la carpeta `server`:
 
-```bash
-./gradlew bootRun
-```
+```bash 
+./gradlew bootRun 
+``` 
 
-El backend quedará disponible en:
+El backend quedará disponible en: 
 
-```text
-http://localhost:8080
-```
+```text 
+http://localhost:8080 
+``` 
 
----
+--- 
 
-## 2. Ejecutar Frontend
+## 3. Ejecutar Frontend 
 
-Desde la carpeta `client`:
+Desde la carpeta `client`: 
 
-```bash
-npm install
-npm run dev
-```
+```bash 
+npm install 
+npm run dev 
+``` 
 
-El frontend quedará disponible en:
+El frontend quedará disponible en: 
 
-```text
-http://localhost:5173
-```
+```text 
+http://localhost:5173 
+``` 
 
----
+--- 
 
-# Ejecución de Pruebas
+# Ejecución de Pruebas 
 
-## Backend
+## Backend 
 
-Ejecutar todos los tests:
+Ejecutar todos los tests: 
 
-```bash
-./gradlew test
-```
+```bash 
+./gradlew test 
+``` 
 
-Generar reporte de cobertura:
+Generar reporte de cobertura: 
 
-```bash
-./gradlew jacocoTestReport
-```
+```bash 
+./gradlew jacocoTestReport 
+``` 
 
-Verificar cobertura mínima:
+Verificar cobertura mínima: 
 
-```bash
-./gradlew jacocoTestCoverageVerification
-```
+```bash 
+./gradlew jacocoTestCoverageVerification 
+``` 
 
-Ejecutar mutation testing:
+Ejecutar mutation testing: 
 
-```bash
-./gradlew pitest
-```
+```bash 
+./gradlew pitest 
+``` 
 
----
+--- 
 
-## Frontend
+## Frontend 
 
-Instalar Playwright:
+Instalar Playwright: 
 
-```bash
-npx playwright install
-```
+```bash 
+npx playwright install 
+``` 
 
-Ejecutar pruebas E2E:
+Ejecutar pruebas E2E: 
 
-```bash
-npm run test:e2e
-```
+```bash 
+npm run test:e2e 
+``` 
 
-Ejecutar pruebas funcionales:
+Ejecutar pruebas funcionales: 
 
-```bash
-npm run test:functional
-```
+```bash 
+npm run test:functional 
+``` 
 
----
+--- 
 
-# Estrategia de Testing
+# Estrategia de Testing 
 
-## Backend
+## Backend 
 
-### Pruebas Unitarias
+### Pruebas Unitarias 
 
-Validan:
+Validan: 
 
-* Reglas del juego.
-* Gestión de turnos.
-* Puntajes.
-* Validaciones.
-* Lógica de cartas.
-* Determinación de ganador.
+* Reglas del juego. 
+* Gestión de turnos. 
+* Puntajes. 
+* Validaciones. 
+* Lógica de cartas. 
+* Determinación de ganador. 
 
-### Pruebas de Integración
+### Pruebas de Integración 
 
-Validan:
+Validan: 
 
-* Endpoints REST.
-* Flujo completo de la API.
-* Persistencia.
-* Integración entre capas.
+* Endpoints REST. 
+* Flujo completo de la API. 
+* Persistencia. 
+* Integración entre capas. 
+* **Mocks de Ollama para pruebas de IA**.
 
----
+--- 
 
-## Frontend
+## Frontend 
 
-### Playwright
+### Playwright 
 
-Escenarios implementados:
+Escenarios implementados: 
 
-* Flujo normal de ronda.
-* Eliminación por carta repetida.
-* Jugadores eliminados.
-* Rotación de turnos.
-* Acción de plantarse.
-* Reinicio de ronda.
-* Flujo de ganador.
+* Flujo normal de ronda. 
+* Eliminación por carta repetida. 
+* Jugadores eliminados. 
+* Rotación de turnos. 
+* Acción de plantarse. 
+* Reinicio de ronda. 
+* Flujo de ganador. 
 
-### Pruebas Funcionales BDD
+### Pruebas Funcionales BDD 
 
-Validan el comportamiento completo de la aplicación utilizando el backend real.
+Validan el comportamiento completo de la aplicación utilizando el backend real. 
 
----
+--- 
 
-# Cumplimiento de la Rúbrica
+# Cumplimiento de la Rúbrica 
 
-El proyecto cumple con los requisitos establecidos:
+El proyecto cumple con los requisitos establecidos: 
 
-✅ Backend desarrollado en Java.
+✅ Backend desarrollado en Java. 
 
-✅ Frontend web funcional.
+✅ Frontend web funcional. 
 
-✅ Integración real Frontend ↔ Backend.
+✅ Integración real Frontend ↔ Backend. 
 
-✅ Persistencia de información.
+✅ Persistencia de información. 
 
-✅ API REST.
+✅ API REST. 
 
-✅ Automatización de pruebas.
+✅ Automatización de pruebas. 
 
-✅ Pruebas unitarias.
+✅ Pruebas unitarias. 
 
-✅ Pruebas de integración.
+✅ Pruebas de integración. 
 
-✅ Pruebas funcionales Playwright.
+✅ Pruebas funcionales Playwright. 
 
-✅ Aplicación de principios SOLID.
+✅ Aplicación de principios SOLID. 
 
-✅ Programación Orientada a Objetos.
+✅ Programación Orientada a Objetos. 
 
-✅ Arquitectura mantenible.
+✅ Arquitectura mantenible. 
 
-✅ Código fuente documentado.
+✅ Código fuente documentado. 
 
-✅ README de ejecución.
+✅ README de ejecución. 
 
-✅ Colección de endpoints.
+✅ Colección de endpoints. 
 
----
+--- 
 
-# Posibles Mejoras Futuras
+# Posibles Mejoras Futuras 
 
-* Ranking global de jugadores.
-* Sistema de autenticación.
-* Estadísticas avanzadas.
-* Historial visual de partidas.
-* Multijugador online distribuido.
-* Diferentes niveles de dificultad para la IA.
+* Ranking global de jugadores. 
+* Sistema de autenticación. 
+* Estadísticas avanzadas. 
+* Historial visual de partidas. 
+* Multijugador online distribuido. 
+* **Optimización de prompts y uso de modelos más ligeros para móviles**.
+* **Diferentes personalidades de IA (Agresiva vs Conservadora)**.
 
----
+--- 
 
-# Conclusión
+# Conclusión 
 
-FLIP7 fue desarrollado siguiendo buenas prácticas de ingeniería de software, integrando backend, frontend, persistencia y pruebas automatizadas. El proyecto demuestra la aplicación de conceptos de calidad de software, diseño orientado a objetos, pruebas automatizadas e integración de sistemas en una solución funcional y extensible.
+FLIP7 fue desarrollado siguiendo buenas prácticas de ingeniería de software, integrando backend, frontend, persistencia y pruebas automatizadas. La inclusión de Inteligencia Artificial mediante Ollama añade una capa de modernidad y desafío al proyecto, demostrando la versatilidad de las arquitecturas actuales para integrar modelos LLM locales en aplicaciones tradicionales.
