@@ -1,3 +1,4 @@
-# macOS AppleDouble metadata files
 ._*
 **/._*
+.vscode
+.gitignore
